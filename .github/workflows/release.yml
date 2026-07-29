@@ -1,0 +1,163 @@
+name: Signed desktop release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: macOS Intel
+            os: macos-15
+            target: --mac dmg zip --x64
+            artifact: mac-x64
+          - name: macOS Apple Silicon
+            os: macos-15
+            target: --mac dmg zip --arm64
+            artifact: mac-arm64
+          - name: Windows x64
+            os: windows-2025
+            target: --win nsis --x64
+            artifact: windows-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      NODE_ENV: production
+      VITE_RELEASE_OWNER: ${{ vars.RELEASE_REPOSITORY_OWNER }}
+      VITE_RELEASE_REPO: haired-releases
+      VITE_PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL }}
+      VITE_SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL }}
+      HAIRED_APP_ID: ${{ vars.HAIRED_APP_ID }}
+      CSC_LINK: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+      CSC_KEY_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ vars.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+      AZURE_TRUSTED_SIGNING_ACCOUNT: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT }}
+      AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE: ${{ vars.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
+      WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: Require Apple signing inputs
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
+          test -n "$APPLE_API_KEY"
+          test -n "$APPLE_API_KEY_ID"
+          test -n "$APPLE_API_ISSUER"
+      - name: Require Azure Trusted Signing inputs
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not $env:AZURE_CLIENT_ID) { throw "AZURE_CLIENT_ID is required" }
+          if (-not $env:AZURE_TRUSTED_SIGNING_ENDPOINT) { throw "Azure Trusted Signing endpoint is required" }
+          if (-not $env:AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE) { throw "Azure certificate profile is required" }
+      - name: Build signed packages
+        run: pnpm --filter @haired/desktop exec electron-builder ${{ matrix.target }} --publish never
+      - name: Reject source maps and secret-like material
+        shell: bash
+        run: |
+          if find apps/desktop/release -type f -name '*.map' | grep -q .; then
+            echo "Production source map found"
+            exit 1
+          fi
+          if grep -R -a -E 'sk-proj-|sk-ant-|AIzaSy|whsec_' apps/desktop/release; then
+            echo "Secret-like material found in release output"
+            exit 1
+          fi
+      - name: Verify Apple signatures and notarization
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          APP_PATH="$(find apps/desktop/release -type d -name 'Haired.app' | head -1)"
+          test -n "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl --assess --type execute --verbose=2 "$APP_PATH"
+          for dmg in apps/desktop/release/*.dmg; do xcrun stapler validate "$dmg"; done
+      - name: Verify Windows Authenticode signature
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem apps/desktop/release -Filter *.exe | Select-Object -First 1
+          if (-not $installer) { throw "Installer missing" }
+          $signature = Get-AuthenticodeSignature $installer.FullName
+          if ($signature.Status -ne "Valid") { throw "Invalid signature: $($signature.Status)" }
+      - uses: anchore/sbom-action@v0
+        with:
+          path: apps/desktop/release
+          format: spdx-json
+          output-file: apps/desktop/release/haired-${{ matrix.artifact }}.spdx.json
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          cd apps/desktop/release
+          find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS-${{ matrix.artifact }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.yml
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/*.json
+            apps/desktop/release/SHA256SUMS-*.txt
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: actions/create-github-app-token@v2
+        id: release-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ vars.RELEASE_REPOSITORY_OWNER }}
+          repositories: haired-releases
+          permission-contents: write
+      - name: Create draft, upload every platform, then promote
+        env:
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
+          RELEASE_REPO: ${{ vars.RELEASE_REPOSITORY_OWNER }}/haired-releases
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --verify-tag=false --title "Haired $RELEASE_TAG" --generate-notes
+          gh release upload "$RELEASE_TAG" release-assets/* --repo "$RELEASE_REPO" --clobber
+          gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft=false --latest
