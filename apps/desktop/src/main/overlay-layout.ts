@@ -34,7 +34,7 @@ export function createOverlayLayout(
 ): OverlayLayout {
   const availableWidth = Math.max(320, workArea.width - OVERLAY_MARGIN * 2)
   const columnWidth = Math.round(
-    Math.min(availableWidth, 580, Math.max(440, workArea.width * 0.38))
+    Math.min(availableWidth, 540, Math.max(420, workArea.width * 0.36))
   )
   const availableHeight = Math.max(280, workArea.height - OVERLAY_MARGIN * 2)
   const leftEdge = workArea.x + OVERLAY_MARGIN
@@ -79,4 +79,16 @@ export function boundsForOverlayColumns(
     width: Math.round(width),
     height: layout.bounds.height
   }
+}
+
+export function overlayBoundsChanged(
+  current: Rectangle,
+  next: Rectangle
+): boolean {
+  return (
+    current.x !== next.x ||
+    current.y !== next.y ||
+    current.width !== next.width ||
+    current.height !== next.height
+  )
 }

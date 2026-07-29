@@ -1314,7 +1314,7 @@
 
 .overlay-head {
   display: grid;
-  height: 54px;
+  height: 50px;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   padding: 0 12px 0 15px;
@@ -1356,26 +1356,35 @@
 }
 
 .overlay-question {
-  padding: 16px 20px 15px;
+  padding: 13px 17px 12px;
   border-bottom: 1px solid var(--border);
 }
 
 .overlay-question p {
-  margin: 7px 0 0;
+  margin: 5px 0 0;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 10.5px;
   line-height: 1.45;
 }
 
 .overlay-answer {
   position: relative;
   min-height: 0;
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+}
+
+.overlay-answer-stacked {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-behavior: smooth;
-  scrollbar-color: var(--border) transparent;
-  scrollbar-width: thin;
+}
+
+.overlay-answer-continuous {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 .overlay-answer:focus-visible {
@@ -1387,12 +1396,22 @@
   width: var(--answer-column-width);
   height: 100%;
   box-sizing: border-box;
-  padding: 20px;
-  column-width: calc(var(--answer-column-width) - 40px);
-  column-gap: 40px;
+  padding: 16px;
+  font-size: 11.5px;
+}
+
+.overlay-pages-stacked {
+  column-width: calc(var(--answer-column-width) - 32px);
+  column-gap: 32px;
   column-fill: auto;
   column-rule: 1px solid var(--border);
-  font-size: 12px;
+}
+
+.overlay-pages-continuous {
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  columns: initial;
 }
 
 .overlay-pages > :first-child {
@@ -1421,6 +1440,7 @@
 .overlay-pages pre code {
   min-width: 0;
   white-space: inherit;
+  font-size: 11px;
 }
 
 .overlay-skeleton {
@@ -1442,13 +1462,28 @@
 }
 
 .overlay-bottom {
-  padding: 12px;
+  padding: 10px;
   border-top: 1px solid var(--border);
 }
 
 .overlay-bottom [data-slot="input-group"] {
   flex: 1;
   min-width: 160px;
+}
+
+.overlay-stack-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.overlay-stack-toggle [data-slot="switch"] {
+  transform: scale(0.82);
 }
 
 .overlay-page-controls {

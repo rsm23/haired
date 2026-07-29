@@ -1879,6 +1879,7 @@ function AnswerOverlay({ id }: { id: string }) {
   const [columnCount, setColumnCount] = useState(1)
   const [currentColumn, setCurrentColumn] = useState(1)
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false)
+  const [stackRight, setStackRight] = useState(true)
   const [answer, setAnswer] = useState('')
   const [status, setStatus] = useState<'thinking' | 'complete' | 'error'>('thinking')
   const [error, setError] = useState('')
@@ -1888,6 +1889,9 @@ function AnswerOverlay({ id }: { id: string }) {
   const answerPagesRef = useRef<HTMLDivElement>(null)
   const reportedColumnCount = useRef(0)
   const columnSnapTimer = useRef<number | null>(null)
+  const desiredScrollLeft = useRef(0)
+  const layoutRequest = useRef(0)
+  const restoringScroll = useRef(false)
   const visibleAnswer = useMemo(
     () =>
       visibleAnswerMarkdown(
@@ -1908,6 +1912,7 @@ function AnswerOverlay({ id }: { id: string }) {
       setStatus('thinking')
       setError('')
       reportedColumnCount.current = 0
+      desiredScrollLeft.current = 0
       answerViewportRef.current?.scrollTo({ left: 0 })
     })
     const removeEvent = api.onOverlayEvent((event: StreamEvent) => {
@@ -1927,6 +1932,7 @@ function AnswerOverlay({ id }: { id: string }) {
       setError('')
       setFollowUp('')
       reportedColumnCount.current = 0
+      desiredScrollLeft.current = 0
       answerViewportRef.current?.scrollTo({ left: 0 })
     })
     return () => {
@@ -1939,29 +1945,47 @@ function AnswerOverlay({ id }: { id: string }) {
   useLayoutEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       const pages = answerPagesRef.current
-      const nextCount = Math.max(
-        1,
-        Math.min(100, Math.ceil((pages?.scrollWidth ?? columnWidth) / columnWidth))
-      )
+      const nextCount = stackRight
+        ? Math.max(
+            1,
+            Math.min(100, Math.ceil((pages?.scrollWidth ?? columnWidth) / columnWidth))
+          )
+        : 1
       setColumnCount(nextCount)
       if (reportedColumnCount.current !== nextCount) {
+        const request = ++layoutRequest.current
         reportedColumnCount.current = nextCount
+        const preservedLeft = stackRight ? desiredScrollLeft.current : 0
+        restoringScroll.current = true
         void api
           .setOverlayColumnCount(id, nextCount)
           .then((result) => {
             if (!result.ok) throw new Error(result.error)
+            window.requestAnimationFrame(() => {
+              if (layoutRequest.current !== request) return
+              const viewport = answerViewportRef.current
+              if (!viewport) return
+              const maximumLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
+              viewport.scrollLeft = Math.min(preservedLeft, maximumLeft)
+              restoringScroll.current = false
+            })
           })
-          .catch((cause) => toast.error(messageOf(cause)))
+          .catch((cause) => {
+            restoringScroll.current = false
+            toast.error(messageOf(cause))
+          })
       }
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [columnWidth, id, visibleAnswer])
+  }, [columnWidth, id, stackRight, visibleAnswer])
 
   useEffect(() => {
     const updatePagination = () => {
       const viewport = answerViewportRef.current
       if (!viewport) return
-      setHasHorizontalOverflow(viewport.scrollWidth > viewport.clientWidth + 1)
+      setHasHorizontalOverflow(
+        stackRight && viewport.scrollWidth > viewport.clientWidth + 1
+      )
       setCurrentColumn(
         Math.min(
           columnCount,
@@ -1972,7 +1996,7 @@ function AnswerOverlay({ id }: { id: string }) {
     updatePagination()
     window.addEventListener('resize', updatePagination)
     return () => window.removeEventListener('resize', updatePagination)
-  }, [columnCount, columnWidth, visibleAnswer])
+  }, [columnCount, columnWidth, stackRight, visibleAnswer])
 
   useEffect(
     () => () => {
@@ -1987,6 +2011,7 @@ function AnswerOverlay({ id }: { id: string }) {
     if (style === codeResponseStyle) return
     const previous = codeResponseStyle
     setCodeResponseStyle(style)
+    desiredScrollLeft.current = 0
     answerViewportRef.current?.scrollTo({ left: 0 })
     try {
       await unwrap(await api.setOverlayCodeResponseStyle(id, style))
@@ -1997,8 +2022,16 @@ function AnswerOverlay({ id }: { id: string }) {
   }
 
   function scrollAnswerColumns(direction: -1 | 1) {
-    answerViewportRef.current?.scrollBy({
-      left: direction * columnWidth,
+    const viewport = answerViewportRef.current
+    if (!viewport) return
+    const maximumLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
+    const nextLeft = Math.min(
+      maximumLeft,
+      Math.max(0, Math.round(viewport.scrollLeft / columnWidth + direction) * columnWidth)
+    )
+    desiredScrollLeft.current = nextLeft
+    viewport.scrollTo({
+      left: nextLeft,
       behavior: 'smooth'
     })
   }
@@ -2006,6 +2039,9 @@ function AnswerOverlay({ id }: { id: string }) {
   function handleAnswerScroll() {
     const viewport = answerViewportRef.current
     if (!viewport) return
+    if (!restoringScroll.current) {
+      desiredScrollLeft.current = viewport.scrollLeft
+    }
     setCurrentColumn(
       Math.min(
         columnCount,
@@ -2019,9 +2055,19 @@ function AnswerOverlay({ id }: { id: string }) {
     columnSnapTimer.current = window.setTimeout(() => {
       const nextLeft = Math.round(viewport.scrollLeft / columnWidth) * columnWidth
       if (Math.abs(nextLeft - viewport.scrollLeft) > 1) {
+        desiredScrollLeft.current = nextLeft
         viewport.scrollTo({ left: nextLeft, behavior: 'smooth' })
       }
     }, 120)
+  }
+
+  function updateStackRight(enabled: boolean) {
+    setStackRight(enabled)
+    setCurrentColumn(1)
+    setHasHorizontalOverflow(false)
+    desiredScrollLeft.current = 0
+    reportedColumnCount.current = 0
+    answerViewportRef.current?.scrollTo({ top: 0, left: 0 })
   }
 
   async function submitFollowUp(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -2111,20 +2157,29 @@ function AnswerOverlay({ id }: { id: string }) {
         <p>{question}</p>
       </section>
       <div
-        className="overlay-answer no-drag"
+        className={cn(
+          'overlay-answer no-drag',
+          stackRight ? 'overlay-answer-stacked' : 'overlay-answer-continuous'
+        )}
         ref={answerViewportRef}
         tabIndex={0}
-        aria-label="Paginated answer"
+        aria-label={stackRight ? 'Paginated answer' : 'Scrollable answer'}
         onScroll={handleAnswerScroll}
         onKeyDown={(event) => {
-          if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          if (
+            stackRight &&
+            (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+          ) {
             event.preventDefault()
             scrollAnswerColumns(event.key === 'ArrowLeft' ? -1 : 1)
           }
         }}
       >
         <div
-          className="overlay-pages markdown"
+          className={cn(
+            'overlay-pages markdown',
+            stackRight ? 'overlay-pages-stacked' : 'overlay-pages-continuous'
+          )}
           ref={answerPagesRef}
           style={{ '--answer-column-width': `${columnWidth}px` } as CSSProperties}
         >
@@ -2175,7 +2230,15 @@ function AnswerOverlay({ id }: { id: string }) {
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
-        {hasHorizontalOverflow && (
+        <label className="overlay-stack-toggle">
+          <span>Stack right</span>
+          <Switch
+            checked={stackRight}
+            onCheckedChange={updateStackRight}
+            aria-label="Stack answer into right-hand pages"
+          />
+        </label>
+        {stackRight && hasHorizontalOverflow && (
           <div className="overlay-page-controls" aria-label="Answer pages">
             <Button
               type="button"

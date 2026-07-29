@@ -41,6 +41,7 @@ import {
 import {
   boundsForOverlayColumns,
   createOverlayLayout,
+  overlayBoundsChanged,
   parseOverlayColumnCount,
   type OverlayLayout
 } from './overlay-layout'
@@ -728,7 +729,10 @@ function registerIpc(): void {
       overlay.layout,
       parseOverlayColumnCount(rawColumnCount)
     )
-    if (!overlay.window.isDestroyed()) overlay.window.setBounds(bounds)
+    if (!overlay.window.isDestroyed()) {
+      const current = overlay.window.getBounds()
+      if (overlayBoundsChanged(current, bounds)) overlay.window.setBounds(bounds)
+    }
     return bounds
   })
   handle('overlay:close', (_event, id) => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   boundsForOverlayColumns,
   createOverlayLayout,
+  overlayBoundsChanged,
   parseOverlayColumnCount
 } from './overlay-layout'
 
@@ -22,8 +23,8 @@ describe('answer overlay layout', () => {
       y: 86,
       height: 826
     })
-    expect(layout.columnWidth).toBeGreaterThanOrEqual(440)
-    expect(layout.columnWidth).toBeLessThanOrEqual(580)
+    expect(layout.columnWidth).toBeGreaterThanOrEqual(420)
+    expect(layout.columnWidth).toBeLessThanOrEqual(540)
   })
 
   it('shifts left when rightward growth reaches the work-area edge', () => {
@@ -77,4 +78,11 @@ describe('answer overlay layout', () => {
       )
     }
   )
+
+  it('does not request a native resize when capped bounds are unchanged', () => {
+    const current = { x: 112, y: 86, width: 1_416, height: 826 }
+
+    expect(overlayBoundsChanged(current, { ...current })).toBe(false)
+    expect(overlayBoundsChanged(current, { ...current, width: 540 })).toBe(true)
+  })
 })
