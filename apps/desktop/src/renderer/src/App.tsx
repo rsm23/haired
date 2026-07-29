@@ -12,6 +12,7 @@ import {
   AlertCircle,
   ArrowRight,
   Cable,
+  Check,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -58,7 +59,8 @@ import type {
   LocalHistoryRecord,
   ProviderId,
   ReasoningEffort,
-  StreamEvent
+  StreamEvent,
+  ThemeColor
 } from '@haired/contracts'
 import {
   Alert,
@@ -150,6 +152,27 @@ type ShortcutId = keyof AppSettings['shortcuts']
 type Point = { x: number; y: number }
 type Selection = { x: number; y: number; width: number; height: number }
 
+const themeOptions: Array<{
+  id: ThemeColor
+  label: string
+  accent: string
+  foreground: string
+}> = [
+  { id: 'blue', label: 'Blue', accent: '#245fbe', foreground: '#ffffff' },
+  { id: 'green', label: 'Green', accent: '#187149', foreground: '#ffffff' },
+  { id: 'red', label: 'Red', accent: '#b23a43', foreground: '#ffffff' },
+  { id: 'yellow', label: 'Yellow', accent: '#e6b91d', foreground: '#211a00' },
+  { id: 'orange', label: 'Orange', accent: '#b84b18', foreground: '#ffffff' },
+  { id: 'gray', label: 'Gray', accent: '#59636f', foreground: '#ffffff' },
+  { id: 'black', label: 'Black', accent: '#17191d', foreground: '#ffffff' },
+  { id: 'purple', label: 'Purple', accent: '#6949ad', foreground: '#ffffff' }
+]
+const themeIds = new Set<ThemeColor>(themeOptions.map((theme) => theme.id))
+
+function parseThemeColor(value: string | null): ThemeColor {
+  return value && themeIds.has(value as ThemeColor) ? (value as ThemeColor) : 'black'
+}
+
 const bridgeError =
   'The secure desktop bridge is unavailable. Open this screen from the installed Haired app.'
 
@@ -182,6 +205,7 @@ const unavailableApi: HairedApi = {
   runPrivacyDiagnostic: async () => ({ ok: false, error: bridgeError }),
   openScreenPermission: async () => ({ ok: false, error: bridgeError }),
   onSettingsNavigate: () => () => undefined,
+  onThemeChanged: () => () => undefined,
   onOverlayInit: () => () => undefined,
   onOverlayEvent: () => () => undefined,
   onOverlayReset: () => () => undefined
@@ -246,6 +270,21 @@ async function unwrap<T>(
 export default function App() {
   const params = new URLSearchParams(window.location.search)
   const kind = params.get('kind') ?? 'settings'
+  const [themeColor, setThemeColor] = useState<ThemeColor>(() =>
+    parseThemeColor(params.get('theme'))
+  )
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = themeColor
+  }, [themeColor])
+
+  useEffect(
+    () =>
+      api.onThemeChanged((theme) => {
+        if (themeIds.has(theme)) setThemeColor(theme)
+      }),
+    []
+  )
 
   let surface
   if (!window.haired) {
@@ -255,7 +294,12 @@ export default function App() {
   } else if (kind === 'overlay') {
     surface = <AnswerOverlay id={params.get('id') ?? ''} />
   } else {
-    surface = <SettingsApp initialPage={(params.get('page') as Page) || 'providers'} />
+    surface = (
+      <SettingsApp
+        initialPage={(params.get('page') as Page) || 'providers'}
+        onThemeChange={setThemeColor}
+      />
+    )
   }
 
   return (
@@ -301,7 +345,13 @@ function Logo({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function SettingsApp({ initialPage }: { initialPage: Page }) {
+function SettingsApp({
+  initialPage,
+  onThemeChange
+}: {
+  initialPage: Page
+  onThemeChange: (theme: ThemeColor) => void
+}) {
   const [page, setPage] = useState<Page>(initialPage)
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null)
   const [error, setError] = useState('')
@@ -310,10 +360,13 @@ function SettingsApp({ initialPage }: { initialPage: Page }) {
     void api
       .getBootstrap()
       .then(unwrap)
-      .then(setBootstrap)
+      .then((data) => {
+        setBootstrap(data)
+        onThemeChange(data.settings.themeColor)
+      })
       .catch((cause) => setError(messageOf(cause)))
     return api.onSettingsNavigate((next) => setPage(next as Page))
-  }, [])
+  }, [onThemeChange])
 
   if (error) {
     return (
@@ -387,7 +440,11 @@ function SettingsApp({ initialPage }: { initialPage: Page }) {
           <ShortcutsPage bootstrap={bootstrap} onChange={setBootstrap} />
         )}
         {page === 'appearance' && (
-          <AppearancePage bootstrap={bootstrap} onChange={setBootstrap} />
+          <AppearancePage
+            bootstrap={bootstrap}
+            onChange={setBootstrap}
+            onThemeChange={onThemeChange}
+          />
         )}
         {page === 'privacy' && <PrivacyPage bootstrap={bootstrap} />}
         {page === 'history' && <HistoryPage bootstrap={bootstrap} />}
@@ -1071,10 +1128,12 @@ function ShortcutKeys({ value }: { value: string }) {
 
 function AppearancePage({
   bootstrap,
-  onChange
+  onChange,
+  onThemeChange
 }: {
   bootstrap: BootstrapData
   onChange: (next: BootstrapData) => void
+  onThemeChange: (theme: ThemeColor) => void
 }) {
   const settings = bootstrap.settings
   const [instruction, setInstruction] = useState(settings.defaultInstruction)
@@ -1084,6 +1143,7 @@ function AppearancePage({
     try {
       const next = await unwrap(await api.updateSettings(patch))
       onChange({ ...bootstrap, settings: next.settings, shortcuts: next.shortcuts })
+      onThemeChange(next.settings.themeColor)
       if (message) toast.success(message)
     } catch (cause) {
       toast.error(messageOf(cause))
@@ -1103,6 +1163,46 @@ function AppearancePage({
         title="Appearance & behavior"
         description="Make the overlay legible without losing sight of the screen underneath."
       />
+      <Card>
+        <CardHeader>
+          <CardTitle>Color theme</CardTitle>
+          <CardDescription>
+            Applied everywhere, including selection controls and every open answer window.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="theme-grid" role="group" aria-label="Color theme">
+            {themeOptions.map((theme) => {
+              const selected = settings.themeColor === theme.id
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  className={cn('theme-option', selected && 'theme-option-selected')}
+                  aria-pressed={selected}
+                  onClick={() => void update({ themeColor: theme.id }, `${theme.label} theme applied.`)}
+                  style={
+                    {
+                      '--theme-swatch': theme.accent,
+                      '--theme-swatch-foreground': theme.foreground
+                    } as CSSProperties
+                  }
+                >
+                  <span className="theme-swatch" aria-hidden="true">
+                    Aa
+                    {selected && <Check />}
+                  </span>
+                  <span>{theme.label}</span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="theme-contrast-note">
+            Text, controls, borders, and code surfaces automatically use the contrast-safe
+            foreground for the selected color.
+          </p>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Response behavior</CardTitle>

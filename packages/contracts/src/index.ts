@@ -6,6 +6,18 @@ export type AnalysisMode = z.infer<typeof analysisModeSchema>
 export const codeResponseStyleSchema = z.enum(['code-only', 'full-reply'])
 export type CodeResponseStyle = z.infer<typeof codeResponseStyleSchema>
 
+export const themeColorSchema = z.enum([
+  'blue',
+  'green',
+  'red',
+  'yellow',
+  'orange',
+  'gray',
+  'black',
+  'purple'
+])
+export type ThemeColor = z.infer<typeof themeColorSchema>
+
 export const reasoningEffortSchema = z.enum([
   'low',
   'medium',
@@ -221,6 +233,7 @@ export type StreamEvent = z.infer<typeof streamEventSchema>
 export const appSettingsSchema = z.object({
   defaultMode: analysisModeSchema.default('fast'),
   codeResponseStyle: codeResponseStyleSchema.default('full-reply'),
+  themeColor: themeColorSchema.default('black'),
   defaultInstruction: z
     .string()
     .min(1)

@@ -55,6 +55,8 @@ const api = {
     ipcRenderer.invoke('privacy:open-permission'),
   onSettingsNavigate: (listener: (payload: unknown) => void): Unsubscribe =>
     subscribe('settings:navigate', listener),
+  onThemeChanged: (listener: (payload: unknown) => void): Unsubscribe =>
+    subscribe('theme:changed', listener),
   onOverlayInit: (listener: (payload: unknown) => void): Unsubscribe =>
     subscribe('overlay:init', listener),
   onOverlayEvent: (listener: (payload: unknown) => void): Unsubscribe =>

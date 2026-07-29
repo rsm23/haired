@@ -43,4 +43,18 @@ describe('settings migration', () => {
       await rm(directory, { recursive: true, force: true })
     }
   })
+
+  it('persists the selected color theme across store instances', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'haired-theme-'))
+    const settingsPath = path.join(directory, 'settings.json')
+    try {
+      const first = new SettingsStore(settingsPath)
+      await first.update({ themeColor: 'green' })
+
+      const relaunched = new SettingsStore(settingsPath)
+      expect((await relaunched.load()).themeColor).toBe('green')
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
 })

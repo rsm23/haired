@@ -164,6 +164,18 @@ function markBusy(): () => void {
   }
 }
 
+function broadcastTheme(themeColor: AppSettings['themeColor']): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    sendToRenderer(settingsWindow, 'theme:changed', themeColor)
+  }
+  if (captureSession?.window && !captureSession.window.isDestroyed()) {
+    sendToRenderer(captureSession.window, 'theme:changed', themeColor)
+  }
+  for (const overlay of overlays.values()) {
+    sendToRenderer(overlay.window, 'theme:changed', themeColor)
+  }
+}
+
 async function showSettings(page = 'providers'): Promise<void> {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show()
@@ -190,7 +202,8 @@ async function showSettings(page = 'providers'): Promise<void> {
     if (settingsWindow === window) settingsWindow = null
   })
   window.once('ready-to-show', () => window.show())
-  await loadRenderer(window, { kind: 'settings', page })
+  const settings = await settingsStore.load()
+  await loadRenderer(window, { kind: 'settings', page, theme: settings.themeColor })
 }
 
 function closeCaptureSession(): void {
@@ -205,6 +218,7 @@ async function startCapture(mode: CaptureMode): Promise<void> {
   closeCaptureSession()
   try {
     const capture = await captureDisplayAtPointer()
+    const settings = await settingsStore.load()
     const window = createProtectedWindow({
       kind: 'selector',
       preload: preloadPath(),
@@ -217,7 +231,7 @@ async function startCapture(mode: CaptureMode): Promise<void> {
     window.on('closed', () => {
       if (captureSession?.window === window) captureSession = null
     })
-    await loadRenderer(window, { kind: 'selector', mode })
+    await loadRenderer(window, { kind: 'selector', mode, theme: settings.themeColor })
     window.showInactive()
   } finally {
     captureStarting = false
@@ -382,8 +396,13 @@ async function createOverlay(input: {
       columnWidth: layout.columnWidth
     })
   })
-  const opacity = (await settingsStore.load()).overlayOpacity
-  await loadRenderer(window, { kind: 'overlay', id, opacity: String(opacity) })
+  const settings = await settingsStore.load()
+  await loadRenderer(window, {
+    kind: 'overlay',
+    id,
+    opacity: String(settings.overlayOpacity),
+    theme: settings.themeColor
+  })
   return overlay
 }
 
@@ -563,6 +582,7 @@ function registerIpc(): void {
     const settings = await settingsStore.update(next)
     historyVault.pruneOlderThan(settings.historyAutoDeleteDays)
     applyLaunchAtLogin(settings.launchAtLogin)
+    if (settings.themeColor !== current.themeColor) broadcastTheme(settings.themeColor)
     return { settings, shortcuts: registerShortcuts(settings) }
   })
   handle('providers:refresh', () => providerManager.statuses())

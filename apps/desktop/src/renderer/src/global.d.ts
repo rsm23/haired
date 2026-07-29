@@ -6,7 +6,8 @@ import type {
   LocalHistoryRecord,
   ProviderId,
   ProviderStatus,
-  StreamEvent
+  StreamEvent,
+  ThemeColor
 } from '@haired/contracts'
 
 export interface BootstrapData {
@@ -78,6 +79,7 @@ export interface HairedApi {
   }>
   openScreenPermission(): IpcResult<unknown>
   onSettingsNavigate(listener: (page: string) => void): Unsubscribe
+  onThemeChanged(listener: (theme: ThemeColor) => void): Unsubscribe
   onOverlayInit(listener: (payload: {
     id: string
     question: string

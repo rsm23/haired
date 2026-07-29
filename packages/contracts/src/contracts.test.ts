@@ -15,6 +15,7 @@ describe('shared contracts', () => {
     const settings = appSettingsSchema.parse({})
     expect(settings.defaultMode).toBe('fast')
     expect(settings.codeResponseStyle).toBe('full-reply')
+    expect(settings.themeColor).toBe('black')
     expect(settings.launchAtLogin).toBe(false)
     expect(settings.historyAutoDeleteDays).toBeNull()
     expect(settings.defaultInstruction).toBe(DEFAULT_INSTRUCTION)
@@ -61,6 +62,12 @@ describe('shared contracts', () => {
         }
       })
     ).toThrow('Claude Code does not support Ultra reasoning')
+  })
+
+  it('accepts supported themes and rejects unknown colors', () => {
+    expect(appSettingsSchema.parse({ themeColor: 'blue' }).themeColor).toBe('blue')
+    expect(appSettingsSchema.parse({ themeColor: 'black' }).themeColor).toBe('black')
+    expect(() => appSettingsSchema.parse({ themeColor: 'rainbow' })).toThrow()
   })
 
   it('rejects oversized prompts and empty capture regions', () => {
