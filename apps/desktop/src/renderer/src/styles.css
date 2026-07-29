@@ -1796,11 +1796,22 @@
   line-height: 1.45;
 }
 
-.overlay-answer {
+.overlay-answer-stage {
   position: relative;
   min-height: 0;
+  overflow: hidden;
+}
+
+.overlay-answer {
+  width: 100%;
+  height: 100%;
   scrollbar-color: var(--border) transparent;
   scrollbar-width: thin;
+}
+
+.overlay-answer-magnifying-cursor,
+.overlay-answer-magnifying-cursor * {
+  cursor: zoom-in !important;
 }
 
 .overlay-answer-stacked {
@@ -1819,6 +1830,39 @@
 .overlay-answer:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--primary) 65%, transparent);
   outline-offset: -2px;
+}
+
+.answer-magnifier {
+  position: absolute;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  border: 2px solid color-mix(in srgb, var(--foreground) 72%, var(--primary));
+  border-radius: 50%;
+  background: var(--background);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.42),
+    0 0 0 3px color-mix(in srgb, var(--background) 75%, transparent);
+  transition: opacity 70ms ease-out;
+  will-change: top, left;
+}
+
+.answer-magnifier-content {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.overlay-pages-magnifier-clone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: top left;
+  will-change: transform;
 }
 
 .overlay-pages {

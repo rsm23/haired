@@ -241,6 +241,7 @@ export const appSettingsSchema = z.object({
     .default(DEFAULT_INSTRUCTION),
   launchAtLogin: z.boolean().default(false),
   overlayOpacity: z.number().min(0.62).max(0.98).default(0.88),
+  magnifyingGlassCursor: z.boolean().default(false),
   historyAutoDeleteDays: z.number().int().positive().nullable().default(null),
   providers: providerSettingsSchema.default({}),
   shortcuts: z

@@ -62,7 +62,9 @@ const api = {
   onOverlayEvent: (listener: (payload: unknown) => void): Unsubscribe =>
     subscribe('overlay:event', listener),
   onOverlayReset: (listener: (payload: unknown) => void): Unsubscribe =>
-    subscribe('overlay:reset', listener)
+    subscribe('overlay:reset', listener),
+  onMagnifyingGlassCursorChanged: (listener: (payload: unknown) => void): Unsubscribe =>
+    subscribe('overlay:magnifying-glass-cursor-changed', listener)
 }
 
 contextBridge.exposeInMainWorld('haired', Object.freeze(api))

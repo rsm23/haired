@@ -17,6 +17,7 @@ describe('shared contracts', () => {
     expect(settings.codeResponseStyle).toBe('full-reply')
     expect(settings.themeColor).toBe('black')
     expect(settings.launchAtLogin).toBe(false)
+    expect(settings.magnifyingGlassCursor).toBe(false)
     expect(settings.historyAutoDeleteDays).toBeNull()
     expect(settings.defaultInstruction).toBe(DEFAULT_INSTRUCTION)
     expect(settings.defaultInstruction).toContain(CODE_ANSWER_INSTRUCTION)

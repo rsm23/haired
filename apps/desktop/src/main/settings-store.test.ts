@@ -57,4 +57,18 @@ describe('settings migration', () => {
       await rm(directory, { recursive: true, force: true })
     }
   })
+
+  it('persists the magnifying-glass cursor preference across store instances', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'haired-cursor-'))
+    const settingsPath = path.join(directory, 'settings.json')
+    try {
+      const first = new SettingsStore(settingsPath)
+      await first.update({ magnifyingGlassCursor: true })
+
+      const relaunched = new SettingsStore(settingsPath)
+      expect((await relaunched.load()).magnifyingGlassCursor).toBe(true)
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
 })

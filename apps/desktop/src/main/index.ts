@@ -176,6 +176,12 @@ function broadcastTheme(themeColor: AppSettings['themeColor']): void {
   }
 }
 
+function broadcastMagnifyingGlassCursor(enabled: boolean): void {
+  for (const overlay of overlays.values()) {
+    sendToRenderer(overlay.window, 'overlay:magnifying-glass-cursor-changed', enabled)
+  }
+}
+
 async function showSettings(page = 'providers'): Promise<void> {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show()
@@ -386,6 +392,7 @@ async function createOverlay(input: {
     overlays.delete(id)
     if (activeOverlayId === id) activeOverlayId = null
   })
+  const settings = await settingsStore.load()
   window.once('ready-to-show', () => {
     window.showInactive()
     sendToRenderer(window, 'overlay:init', {
@@ -393,14 +400,15 @@ async function createOverlay(input: {
       question: input.question,
       mode: input.mode,
       codeResponseStyle: input.codeResponseStyle,
-      columnWidth: layout.columnWidth
+      columnWidth: layout.columnWidth,
+      magnifyingGlassCursor: settings.magnifyingGlassCursor
     })
   })
-  const settings = await settingsStore.load()
   await loadRenderer(window, {
     kind: 'overlay',
     id,
     opacity: String(settings.overlayOpacity),
+    magnifyingGlassCursor: String(settings.magnifyingGlassCursor),
     theme: settings.themeColor
   })
   return overlay
@@ -583,6 +591,9 @@ function registerIpc(): void {
     historyVault.pruneOlderThan(settings.historyAutoDeleteDays)
     applyLaunchAtLogin(settings.launchAtLogin)
     if (settings.themeColor !== current.themeColor) broadcastTheme(settings.themeColor)
+    if (settings.magnifyingGlassCursor !== current.magnifyingGlassCursor) {
+      broadcastMagnifyingGlassCursor(settings.magnifyingGlassCursor)
+    }
     return { settings, shortcuts: registerShortcuts(settings) }
   })
   handle('providers:refresh', () => providerManager.statuses())
@@ -751,7 +762,9 @@ function registerIpc(): void {
     )
     if (!overlay.window.isDestroyed()) {
       const current = overlay.window.getBounds()
-      if (overlayBoundsChanged(current, bounds)) overlay.window.setBounds(bounds)
+      if (overlayBoundsChanged(current, bounds)) {
+        overlay.window.setBounds(bounds, process.platform === 'darwin')
+      }
     }
     return bounds
   })

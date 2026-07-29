@@ -86,12 +86,14 @@ export interface HairedApi {
     mode: AnalysisMode
     codeResponseStyle: CodeResponseStyle
     columnWidth: number
+    magnifyingGlassCursor: boolean
   }) => void): Unsubscribe
   onOverlayEvent(listener: (payload: StreamEvent) => void): Unsubscribe
   onOverlayReset(listener: (payload: {
     question: string
     codeResponseStyle: CodeResponseStyle
   }) => void): Unsubscribe
+  onMagnifyingGlassCursorChanged(listener: (enabled: boolean) => void): Unsubscribe
 }
 
 declare global {

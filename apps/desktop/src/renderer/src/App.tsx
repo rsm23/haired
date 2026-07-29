@@ -6,7 +6,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent
 } from 'react'
 import {
   AlertCircle,
@@ -146,6 +147,16 @@ import {
 import { cn } from '@/lib/utils'
 import { visibleAnswerMarkdown } from '../../shared/code-response'
 import type { BootstrapData, HairedApi } from './global'
+import {
+  answerColumnAt,
+  clampAnswerScrollLeft,
+  stableAnswerColumnCount
+} from './overlay-pagination'
+import {
+  ANSWER_MAGNIFIER_SIZE,
+  ANSWER_MAGNIFIER_ZOOM,
+  answerMagnifierGeometry
+} from './answer-magnifier'
 
 type Page = 'providers' | 'shortcuts' | 'appearance' | 'privacy' | 'history'
 type ShortcutId = keyof AppSettings['shortcuts']
@@ -208,7 +219,8 @@ const unavailableApi: HairedApi = {
   onThemeChanged: () => () => undefined,
   onOverlayInit: () => () => undefined,
   onOverlayEvent: () => () => undefined,
-  onOverlayReset: () => () => undefined
+  onOverlayReset: () => () => undefined,
+  onMagnifyingGlassCursorChanged: () => () => undefined
 }
 
 const api = window.haired ?? unavailableApi
@@ -1284,6 +1296,29 @@ function AppearancePage({
             <Separator />
             <Field orientation="horizontal">
               <div>
+                <FieldTitle id="magnifying-glass-cursor-label">
+                  Magnifying-glass cursor
+                </FieldTitle>
+                <FieldDescription>
+                  Show a magnifying glass while hovering over answer content.
+                </FieldDescription>
+              </div>
+              <Switch
+                checked={settings.magnifyingGlassCursor}
+                aria-labelledby="magnifying-glass-cursor-label"
+                onCheckedChange={(checked) =>
+                  void update(
+                    { magnifyingGlassCursor: checked },
+                    checked
+                      ? 'Magnifying-glass cursor enabled.'
+                      : 'Magnifying-glass cursor disabled.'
+                  )
+                }
+              />
+            </Field>
+            <Separator />
+            <Field orientation="horizontal">
+              <div>
                 <FieldTitle id="launch-at-login-label">Launch at login</FieldTitle>
                 <FieldDescription>
                   Start quietly in the background after you sign in.
@@ -1970,7 +2005,11 @@ function Selector({ mode }: { mode: 'instant' | 'ask' }) {
 }
 
 function AnswerOverlay({ id }: { id: string }) {
-  const opacity = Number(new URLSearchParams(window.location.search).get('opacity') ?? 0.9)
+  const params = new URLSearchParams(window.location.search)
+  const opacity = Number(params.get('opacity') ?? 0.9)
+  const [magnifyingGlassCursor, setMagnifyingGlassCursor] = useState(
+    params.get('magnifyingGlassCursor') === 'true'
+  )
   const [question, setQuestion] = useState('Preparing your question…')
   const [mode, setMode] = useState<AnalysisMode>('fast')
   const [codeResponseStyle, setCodeResponseStyle] =
@@ -1987,11 +2026,21 @@ function AnswerOverlay({ id }: { id: string }) {
   const [followUp, setFollowUp] = useState('')
   const answerViewportRef = useRef<HTMLDivElement>(null)
   const answerPagesRef = useRef<HTMLDivElement>(null)
-  const reportedColumnCount = useRef(0)
+  const answerMagnifierRef = useRef<HTMLDivElement>(null)
+  const answerMagnifierContentRef = useRef<HTMLDivElement>(null)
+  const answerMagnifierPoint = useRef<Point | null>(null)
+  const reportedColumnCount = useRef(1)
+  const pendingColumnCount = useRef(1)
+  const columnCountRef = useRef(1)
+  const columnWidthRef = useRef(520)
+  const stackRightRef = useRef(true)
+  const columnResizeTimer = useRef<number | null>(null)
   const columnSnapTimer = useRef<number | null>(null)
+  const scrollRestoreFrame = useRef<number | null>(null)
+  const scrollRestoreTimer = useRef<number | null>(null)
   const desiredScrollLeft = useRef(0)
   const layoutRequest = useRef(0)
-  const restoringScroll = useRef(false)
+  const preservingScroll = useRef(false)
   const visibleAnswer = useMemo(
     () =>
       visibleAnswerMarkdown(
@@ -2008,18 +2057,31 @@ function AnswerOverlay({ id }: { id: string }) {
       setMode(payload.mode)
       setCodeResponseStyle(payload.codeResponseStyle)
       setColumnWidth(payload.columnWidth)
+      columnWidthRef.current = payload.columnWidth
+      setMagnifyingGlassCursor(payload.magnifyingGlassCursor)
       setAnswer('')
       setStatus('thinking')
       setError('')
-      reportedColumnCount.current = 0
+      reportedColumnCount.current = 1
+      pendingColumnCount.current = 1
+      columnCountRef.current = 1
+      setColumnCount(1)
       desiredScrollLeft.current = 0
+      preservingScroll.current = false
       answerViewportRef.current?.scrollTo({ left: 0 })
     })
     const removeEvent = api.onOverlayEvent((event: StreamEvent) => {
       if (event.type === 'started') setStatus('thinking')
-      if (event.type === 'delta') setAnswer((current) => current + event.text)
-      if (event.type === 'completed') setStatus('complete')
+      if (event.type === 'delta') {
+        preserveScrollBeforeLayout()
+        setAnswer((current) => current + event.text)
+      }
+      if (event.type === 'completed') {
+        preserveScrollBeforeLayout()
+        setStatus('complete')
+      }
       if (event.type === 'error') {
+        preserveScrollBeforeLayout()
         setStatus('error')
         setError(event.message)
       }
@@ -2031,67 +2093,63 @@ function AnswerOverlay({ id }: { id: string }) {
       setStatus('thinking')
       setError('')
       setFollowUp('')
+      clearColumnResizeTimer()
+      clearScrollRestoreFrame()
       reportedColumnCount.current = 0
+      pendingColumnCount.current = 1
+      columnCountRef.current = 1
+      setColumnCount(1)
       desiredScrollLeft.current = 0
+      preservingScroll.current = true
       answerViewportRef.current?.scrollTo({ left: 0 })
+    })
+    const removeCursorChange = api.onMagnifyingGlassCursorChanged((enabled) => {
+      setMagnifyingGlassCursor(enabled)
     })
     return () => {
       removeInit()
       removeEvent()
       removeReset()
+      removeCursorChange()
     }
   }, [])
 
   useLayoutEffect(() => {
+    if (!magnifyingGlassCursor || !answerMagnifierPoint.current) return
+    refreshAnswerMagnifier()
+    updateAnswerMagnifierPosition()
+  }, [columnWidth, magnifyingGlassCursor, stackRight, visibleAnswer])
+
+  useEffect(() => {
+    if (magnifyingGlassCursor) return
+    hideAnswerMagnifier()
+  }, [magnifyingGlassCursor])
+
+  useLayoutEffect(() => {
     const frame = window.requestAnimationFrame(() => {
+      const viewport = answerViewportRef.current
       const pages = answerPagesRef.current
-      const nextCount = stackRight
-        ? Math.max(
-            1,
-            Math.min(100, Math.ceil((pages?.scrollWidth ?? columnWidth) / columnWidth))
-          )
-        : 1
-      setColumnCount(nextCount)
-      if (reportedColumnCount.current !== nextCount) {
-        const request = ++layoutRequest.current
-        reportedColumnCount.current = nextCount
-        const preservedLeft = stackRight ? desiredScrollLeft.current : 0
-        restoringScroll.current = true
-        void api
-          .setOverlayColumnCount(id, nextCount)
-          .then((result) => {
-            if (!result.ok) throw new Error(result.error)
-            window.requestAnimationFrame(() => {
-              if (layoutRequest.current !== request) return
-              const viewport = answerViewportRef.current
-              if (!viewport) return
-              const maximumLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
-              viewport.scrollLeft = Math.min(preservedLeft, maximumLeft)
-              restoringScroll.current = false
-            })
-          })
-          .catch((cause) => {
-            restoringScroll.current = false
-            toast.error(messageOf(cause))
-          })
-      }
+      if (!viewport || !pages) return
+      const measuredCount = pages.scrollWidth / columnWidthRef.current
+      const nextCount = stableAnswerColumnCount(
+        measuredCount,
+        reportedColumnCount.current,
+        pendingColumnCount.current,
+        stackRightRef.current
+      )
+      columnCountRef.current = nextCount
+      setColumnCount((current) => current === nextCount ? current : nextCount)
+      restoreDesiredScroll(false)
+      queueColumnResize(nextCount)
+      queueScrollRestore()
     })
     return () => window.cancelAnimationFrame(frame)
   }, [columnWidth, id, stackRight, visibleAnswer])
 
   useEffect(() => {
     const updatePagination = () => {
-      const viewport = answerViewportRef.current
-      if (!viewport) return
-      setHasHorizontalOverflow(
-        stackRight && viewport.scrollWidth > viewport.clientWidth + 1
-      )
-      setCurrentColumn(
-        Math.min(
-          columnCount,
-          Math.max(1, Math.round(viewport.scrollLeft / columnWidth) + 1)
-        )
-      )
+      if (preservingScroll.current) restoreDesiredScroll(false)
+      else syncPagination()
     }
     updatePagination()
     window.addEventListener('resize', updatePagination)
@@ -2103,13 +2161,186 @@ function AnswerOverlay({ id }: { id: string }) {
       if (columnSnapTimer.current !== null) {
         window.clearTimeout(columnSnapTimer.current)
       }
+      clearColumnResizeTimer()
+      clearScrollRestoreFrame()
     },
     []
   )
 
+  function clearColumnResizeTimer() {
+    if (columnResizeTimer.current === null) return
+    window.clearTimeout(columnResizeTimer.current)
+    columnResizeTimer.current = null
+  }
+
+  function clearScrollRestoreFrame() {
+    if (scrollRestoreFrame.current !== null) {
+      window.cancelAnimationFrame(scrollRestoreFrame.current)
+      scrollRestoreFrame.current = null
+    }
+    if (scrollRestoreTimer.current !== null) {
+      window.clearTimeout(scrollRestoreTimer.current)
+      scrollRestoreTimer.current = null
+    }
+  }
+
+  function preserveScrollBeforeLayout() {
+    const viewport = answerViewportRef.current
+    if (!preservingScroll.current && viewport) {
+      desiredScrollLeft.current = viewport.scrollLeft
+    }
+    preservingScroll.current = true
+    clearScrollRestoreFrame()
+  }
+
+  function syncPagination() {
+    const viewport = answerViewportRef.current
+    if (!viewport) return
+    setHasHorizontalOverflow(
+      stackRightRef.current && viewport.scrollWidth > viewport.clientWidth + 1
+    )
+    setCurrentColumn(
+      answerColumnAt(
+        viewport.scrollLeft,
+        columnWidthRef.current,
+        columnCountRef.current
+      )
+    )
+  }
+
+  function restoreDesiredScroll(release: boolean) {
+    const viewport = answerViewportRef.current
+    if (!viewport) {
+      if (release) preservingScroll.current = false
+      return
+    }
+    const nextLeft = clampAnswerScrollLeft(
+      desiredScrollLeft.current,
+      viewport.scrollWidth,
+      viewport.clientWidth
+    )
+    if (Math.abs(viewport.scrollLeft - nextLeft) > 0.5) {
+      viewport.scrollLeft = nextLeft
+    }
+    syncPagination()
+    updateAnswerMagnifierPosition()
+    if (release) preservingScroll.current = false
+  }
+
+  function refreshAnswerMagnifier() {
+    const pages = answerPagesRef.current
+    const content = answerMagnifierContentRef.current
+    if (!pages || !content) return
+
+    const clone = pages.cloneNode(true) as HTMLDivElement
+    clone.removeAttribute('id')
+    clone.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'))
+    clone.classList.add('overlay-pages-magnifier-clone')
+    clone.setAttribute('aria-hidden', 'true')
+    clone.style.width = `${pages.offsetWidth}px`
+    clone.style.height = `${pages.offsetHeight}px`
+    content.replaceChildren(clone)
+  }
+
+  function updateAnswerMagnifierPosition() {
+    const point = answerMagnifierPoint.current
+    const viewport = answerViewportRef.current
+    const lens = answerMagnifierRef.current
+    const content = answerMagnifierContentRef.current
+    const clone = content?.firstElementChild as HTMLDivElement | null
+    if (!point || !viewport || !lens || !clone) return
+
+    const geometry = answerMagnifierGeometry({
+      pointerX: point.x,
+      pointerY: point.y,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop
+    })
+    lens.style.left = `${geometry.lensLeft}px`
+    lens.style.top = `${geometry.lensTop}px`
+    lens.style.opacity = '1'
+    clone.style.transform =
+      `translate(${geometry.contentTranslateX}px, ${geometry.contentTranslateY}px) ` +
+      `scale(${ANSWER_MAGNIFIER_ZOOM})`
+  }
+
+  function showAnswerMagnifier(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!magnifyingGlassCursor) return
+    const viewport = answerViewportRef.current
+    if (!viewport) return
+    const bounds = viewport.getBoundingClientRect()
+    answerMagnifierPoint.current = {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top
+    }
+    if (!answerMagnifierContentRef.current?.firstElementChild) {
+      refreshAnswerMagnifier()
+    }
+    updateAnswerMagnifierPosition()
+  }
+
+  function hideAnswerMagnifier() {
+    answerMagnifierPoint.current = null
+    if (answerMagnifierRef.current) answerMagnifierRef.current.style.opacity = '0'
+    answerMagnifierContentRef.current?.replaceChildren()
+  }
+
+  function queueScrollRestore() {
+    clearScrollRestoreFrame()
+    scrollRestoreFrame.current = window.requestAnimationFrame(() => {
+      restoreDesiredScroll(false)
+      scrollRestoreFrame.current = window.requestAnimationFrame(() => {
+        restoreDesiredScroll(false)
+        scrollRestoreFrame.current = null
+      })
+    })
+    scrollRestoreTimer.current = window.setTimeout(() => {
+      restoreDesiredScroll(true)
+      scrollRestoreTimer.current = null
+    }, 260)
+  }
+
+  function queueColumnResize(nextCount: number) {
+    pendingColumnCount.current = stackRightRef.current
+      ? Math.max(pendingColumnCount.current, nextCount)
+      : 1
+    if (columnResizeTimer.current !== null) return
+    columnResizeTimer.current = window.setTimeout(() => {
+      columnResizeTimer.current = null
+      const targetCount = pendingColumnCount.current
+      if (reportedColumnCount.current === targetCount) return
+      const request = ++layoutRequest.current
+      reportedColumnCount.current = targetCount
+      preserveScrollBeforeLayout()
+      void api
+        .setOverlayColumnCount(id, targetCount)
+        .then((result) => {
+          if (!result.ok) throw new Error(result.error)
+          if (layoutRequest.current === request) queueScrollRestore()
+        })
+        .catch((cause) => {
+          preservingScroll.current = false
+          toast.error(messageOf(cause))
+        })
+        .finally(() => {
+          if (pendingColumnCount.current !== reportedColumnCount.current) {
+            queueColumnResize(pendingColumnCount.current)
+          }
+        })
+    }, 220)
+  }
+
+  function allowUserScroll() {
+    preservingScroll.current = false
+    clearScrollRestoreFrame()
+  }
+
   async function updateOverlayCodeResponseStyle(style: CodeResponseStyle) {
     if (style === codeResponseStyle) return
     const previous = codeResponseStyle
+    clearColumnResizeTimer()
+    reportedColumnCount.current = 0
+    pendingColumnCount.current = 1
     setCodeResponseStyle(style)
     desiredScrollLeft.current = 0
     answerViewportRef.current?.scrollTo({ left: 0 })
@@ -2127,7 +2358,11 @@ function AnswerOverlay({ id }: { id: string }) {
     const maximumLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
     const nextLeft = Math.min(
       maximumLeft,
-      Math.max(0, Math.round(viewport.scrollLeft / columnWidth + direction) * columnWidth)
+      Math.max(
+        0,
+        Math.round(viewport.scrollLeft / columnWidthRef.current + direction) *
+          columnWidthRef.current
+      )
     )
     desiredScrollLeft.current = nextLeft
     viewport.scrollTo({
@@ -2139,34 +2374,46 @@ function AnswerOverlay({ id }: { id: string }) {
   function handleAnswerScroll() {
     const viewport = answerViewportRef.current
     if (!viewport) return
-    if (!restoringScroll.current) {
+    syncPagination()
+    if (!preservingScroll.current) {
       desiredScrollLeft.current = viewport.scrollLeft
+    } else {
+      updateAnswerMagnifierPosition()
+      return
     }
-    setCurrentColumn(
-      Math.min(
-        columnCount,
-        Math.max(1, Math.round(viewport.scrollLeft / columnWidth) + 1)
-      )
-    )
-    setHasHorizontalOverflow(viewport.scrollWidth > viewport.clientWidth + 1)
+    updateAnswerMagnifierPosition()
     if (columnSnapTimer.current !== null) {
       window.clearTimeout(columnSnapTimer.current)
     }
     columnSnapTimer.current = window.setTimeout(() => {
-      const nextLeft = Math.round(viewport.scrollLeft / columnWidth) * columnWidth
+      const nextLeft =
+        Math.round(viewport.scrollLeft / columnWidthRef.current) *
+        columnWidthRef.current
       if (Math.abs(nextLeft - viewport.scrollLeft) > 1) {
-        desiredScrollLeft.current = nextLeft
-        viewport.scrollTo({ left: nextLeft, behavior: 'smooth' })
+        desiredScrollLeft.current = clampAnswerScrollLeft(
+          nextLeft,
+          viewport.scrollWidth,
+          viewport.clientWidth
+        )
+        viewport.scrollTo({ left: desiredScrollLeft.current, behavior: 'smooth' })
       }
     }, 120)
   }
 
   function updateStackRight(enabled: boolean) {
+    clearColumnResizeTimer()
+    clearScrollRestoreFrame()
+    layoutRequest.current += 1
+    stackRightRef.current = enabled
     setStackRight(enabled)
     setCurrentColumn(1)
     setHasHorizontalOverflow(false)
     desiredScrollLeft.current = 0
     reportedColumnCount.current = 0
+    pendingColumnCount.current = 1
+    columnCountRef.current = 1
+    setColumnCount(1)
+    preservingScroll.current = true
     answerViewportRef.current?.scrollTo({ top: 0, left: 0 })
   }
 
@@ -2256,48 +2503,69 @@ function AnswerOverlay({ id }: { id: string }) {
         <span>QUESTION</span>
         <p>{question}</p>
       </section>
-      <div
-        className={cn(
-          'overlay-answer no-drag',
-          stackRight ? 'overlay-answer-stacked' : 'overlay-answer-continuous'
-        )}
-        ref={answerViewportRef}
-        tabIndex={0}
-        aria-label={stackRight ? 'Paginated answer' : 'Scrollable answer'}
-        onScroll={handleAnswerScroll}
-        onKeyDown={(event) => {
-          if (
-            stackRight &&
-            (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
-          ) {
-            event.preventDefault()
-            scrollAnswerColumns(event.key === 'ArrowLeft' ? -1 : 1)
-          }
-        }}
-      >
+      <div className="overlay-answer-stage">
         <div
           className={cn(
-            'overlay-pages markdown',
-            stackRight ? 'overlay-pages-stacked' : 'overlay-pages-continuous'
+            'overlay-answer no-drag',
+            stackRight ? 'overlay-answer-stacked' : 'overlay-answer-continuous',
+            magnifyingGlassCursor && 'overlay-answer-magnifying-cursor'
           )}
-          ref={answerPagesRef}
-          style={{ '--answer-column-width': `${columnWidth}px` } as CSSProperties}
+          ref={answerViewportRef}
+          tabIndex={0}
+          aria-label={stackRight ? 'Paginated answer' : 'Scrollable answer'}
+          onScroll={handleAnswerScroll}
+          onWheel={allowUserScroll}
+          onPointerDown={allowUserScroll}
+          onPointerMove={showAnswerMagnifier}
+          onPointerLeave={hideAnswerMagnifier}
+          onKeyDown={(event) => {
+            if (
+              stackRight &&
+              (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+            ) {
+              event.preventDefault()
+              scrollAnswerColumns(event.key === 'ArrowLeft' ? -1 : 1)
+            }
+          }}
         >
-          {status === 'thinking' && !visibleAnswer && (
-            <div className="overlay-skeleton" aria-label="Generating answer">
-              <Skeleton />
-              <Skeleton />
-              <Skeleton />
-            </div>
-          )}
-          {visibleAnswer && <MarkdownAnswer>{visibleAnswer}</MarkdownAnswer>}
-          {status === 'error' && (
-            <Alert variant="destructive">
-              <EyeOff />
-              <AlertTitle>Analysis failed</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <div
+            className={cn(
+              'overlay-pages markdown',
+              stackRight ? 'overlay-pages-stacked' : 'overlay-pages-continuous'
+            )}
+            ref={answerPagesRef}
+            style={{ '--answer-column-width': `${columnWidth}px` } as CSSProperties}
+          >
+            {status === 'thinking' && !visibleAnswer && (
+              <div className="overlay-skeleton" aria-label="Generating answer">
+                <Skeleton />
+                <Skeleton />
+                <Skeleton />
+              </div>
+            )}
+            {visibleAnswer && <MarkdownAnswer>{visibleAnswer}</MarkdownAnswer>}
+            {status === 'error' && (
+              <Alert variant="destructive">
+                <EyeOff />
+                <AlertTitle>Analysis failed</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </div>
+        <div
+          className="answer-magnifier"
+          ref={answerMagnifierRef}
+          aria-hidden="true"
+          style={{
+            width: ANSWER_MAGNIFIER_SIZE,
+            height: ANSWER_MAGNIFIER_SIZE
+          }}
+        >
+          <div
+            className="answer-magnifier-content"
+            ref={answerMagnifierContentRef}
+          />
         </div>
       </div>
       <footer className="overlay-bottom no-drag">
