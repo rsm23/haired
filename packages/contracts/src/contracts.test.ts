@@ -4,6 +4,7 @@ import {
   appSettingsSchema,
   captureRegionSchema,
   CODE_ANSWER_INSTRUCTION,
+  CODE_ONLY_ANSWER_INSTRUCTION,
   DEFAULT_INSTRUCTION,
   SCREEN_TASK_INSTRUCTION,
   streamEventSchema
@@ -13,6 +14,7 @@ describe('shared contracts', () => {
   it('applies privacy-preserving desktop defaults', () => {
     const settings = appSettingsSchema.parse({})
     expect(settings.defaultMode).toBe('fast')
+    expect(settings.codeResponseStyle).toBe('full-reply')
     expect(settings.launchAtLogin).toBe(false)
     expect(settings.historyAutoDeleteDays).toBeNull()
     expect(settings.defaultInstruction).toBe(DEFAULT_INSTRUCTION)
@@ -23,6 +25,7 @@ describe('shared contracts', () => {
     )
     expect(settings.defaultInstruction).toContain('complete, directly usable code')
     expect(settings.defaultInstruction).toContain('fenced Markdown code block')
+    expect(CODE_ONLY_ANSWER_INSTRUCTION).toContain('only complete fenced Markdown code blocks')
     expect(settings.providers.selected).toBe('codex')
     expect(settings.providers.codex).toMatchObject({
       enabled: true,
@@ -70,6 +73,17 @@ describe('shared contracts', () => {
       })
     ).toThrow()
     expect(() => captureRegionSchema.parse({ x: 0, y: 0, width: 0, height: 20 })).toThrow()
+  })
+
+  it('defaults old analysis metadata to full replies', () => {
+    expect(
+      analysisMetadataSchema.parse({
+        requestId: crypto.randomUUID(),
+        mode: 'fast',
+        prompt: 'Solve this',
+        conversation: []
+      }).codeResponseStyle
+    ).toBe('full-reply')
   })
 
   it('validates every streaming event shape', () => {

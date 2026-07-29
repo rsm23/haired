@@ -1024,6 +1024,12 @@
   overflow: hidden;
 }
 
+.history-record-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .history-preview > [data-slot="empty"] {
   flex: 1;
 }
@@ -1309,7 +1315,7 @@
 .overlay-head {
   display: grid;
   height: 54px;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   padding: 0 12px 0 15px;
   border-bottom: 1px solid var(--border);
@@ -1331,6 +1337,20 @@
   gap: 7px;
 }
 
+.overlay-status {
+  min-width: 0;
+  justify-content: center;
+}
+
+.overlay-view-toggle {
+  margin-left: 3px;
+}
+
+.overlay-view-toggle [data-slot="toggle-group-item"] {
+  padding-inline: 8px;
+  font-size: 10px;
+}
+
 .overlay-window-actions {
   justify-content: flex-end;
 }
@@ -1348,12 +1368,59 @@
 }
 
 .overlay-answer {
+  position: relative;
   min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
 }
 
-.overlay-answer .markdown {
+.overlay-answer:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 65%, transparent);
+  outline-offset: -2px;
+}
+
+.overlay-pages {
+  width: var(--answer-column-width);
+  height: 100%;
+  box-sizing: border-box;
   padding: 20px;
+  column-width: calc(var(--answer-column-width) - 40px);
+  column-gap: 40px;
+  column-fill: auto;
+  column-rule: 1px solid var(--border);
   font-size: 12px;
+}
+
+.overlay-pages > :first-child {
+  margin-top: 0;
+}
+
+.overlay-pages h1,
+.overlay-pages h2,
+.overlay-pages h3,
+.overlay-pages h4,
+.overlay-pages p,
+.overlay-pages li,
+.overlay-pages blockquote {
+  break-inside: avoid-column;
+}
+
+.overlay-pages pre {
+  overflow: visible;
+  break-inside: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.overlay-pages pre code {
+  min-width: 0;
+  white-space: inherit;
 }
 
 .overlay-skeleton {
@@ -1381,6 +1448,23 @@
 
 .overlay-bottom [data-slot="input-group"] {
   flex: 1;
+  min-width: 160px;
+}
+
+.overlay-page-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.overlay-page-controls span {
+  min-width: 42px;
+  color: var(--muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 @media (max-width: 900px) {

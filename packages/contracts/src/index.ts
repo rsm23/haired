@@ -3,6 +3,9 @@ import { z } from 'zod'
 export const analysisModeSchema = z.enum(['fast', 'deep'])
 export type AnalysisMode = z.infer<typeof analysisModeSchema>
 
+export const codeResponseStyleSchema = z.enum(['code-only', 'full-reply'])
+export type CodeResponseStyle = z.infer<typeof codeResponseStyleSchema>
+
 export const reasoningEffortSchema = z.enum([
   'low',
   'medium',
@@ -47,6 +50,13 @@ export const CODE_ANSWER_INSTRUCTION = [
   '- Return the complete, directly usable code for every file or block you propose changing, including required imports, types, configuration, and error handling.',
   '- Do not replace required code with ellipses, placeholder comments, or partial snippets.',
   '- Put every code sample in a fenced Markdown code block with an accurate language tag such as `typescript`, `python`, or `bash` so the app can syntax-highlight it.'
+].join('\n')
+
+export const CODE_ONLY_ANSWER_INSTRUCTION = [
+  'When the request or selected screen concerns code, return only complete fenced Markdown code blocks.',
+  '- Do not put explanations, headings, filenames, or other prose outside the code fences.',
+  '- Include every required file or block in full, with an accurate language tag, and never use ellipses or placeholder comments.',
+  'When the request is not about code, answer normally.'
 ].join('\n')
 
 export const DEFAULT_INSTRUCTION = [
@@ -164,11 +174,15 @@ export type ConversationTurn = z.infer<typeof conversationTurnSchema>
 export const analysisMetadataSchema = z.object({
   requestId: z.string().uuid(),
   mode: analysisModeSchema,
+  codeResponseStyle: codeResponseStyleSchema.default('full-reply'),
   interaction: z.enum(['instant', 'ask']).optional(),
   prompt: z.string().min(1).max(4_000),
   conversation: z.array(conversationTurnSchema).max(20).default([])
 })
-export type AnalysisMetadata = z.infer<typeof analysisMetadataSchema>
+type ParsedAnalysisMetadata = z.infer<typeof analysisMetadataSchema>
+export type AnalysisMetadata = Omit<ParsedAnalysisMetadata, 'codeResponseStyle'> & {
+  codeResponseStyle?: CodeResponseStyle
+}
 
 export const streamEventSchema = z.discriminatedUnion('type', [
   z.object({
@@ -206,6 +220,7 @@ export type StreamEvent = z.infer<typeof streamEventSchema>
 
 export const appSettingsSchema = z.object({
   defaultMode: analysisModeSchema.default('fast'),
+  codeResponseStyle: codeResponseStyleSchema.default('full-reply'),
   defaultInstruction: z
     .string()
     .min(1)
@@ -237,6 +252,7 @@ export const localHistoryRecordSchema = z.object({
   id: z.string().uuid(),
   createdAt: z.string().datetime(),
   mode: analysisModeSchema,
+  codeResponseStyle: codeResponseStyleSchema.default('full-reply'),
   title: z.string(),
   question: z.string(),
   answer: z.string(),

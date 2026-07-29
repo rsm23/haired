@@ -4,9 +4,12 @@ import Database from 'better-sqlite3'
 import { nativeImage } from 'electron'
 import type {
   AnalysisMode,
+  CodeResponseStyle,
   HistorySummary,
   LocalHistoryRecord
 } from '@haired/contracts'
+import { codeResponseStyleSchema } from '@haired/contracts'
+import { visibleAnswerMarkdown } from '../shared/code-response'
 import { decryptRecord, encryptRecord } from './history-crypto'
 import { ProtectedFile } from './secure-storage'
 
@@ -14,6 +17,7 @@ interface HistoryRow {
   id: string
   created_at: string
   mode: AnalysisMode
+  response_style: CodeResponseStyle
   byte_size: number
   title: Buffer
   question: Buffer
@@ -21,6 +25,40 @@ interface HistoryRow {
   provider: Buffer | null
   model: Buffer | null
   screenshot: Buffer
+}
+
+interface HistorySchemaDatabase {
+  exec(sql: string): unknown
+  pragma(source: string): unknown
+}
+
+export function ensureHistorySchema(database: HistorySchemaDatabase): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS history (
+      id TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      mode TEXT NOT NULL CHECK (mode IN ('fast', 'deep')),
+      response_style TEXT NOT NULL DEFAULT 'full-reply'
+        CHECK (response_style IN ('code-only', 'full-reply')),
+      byte_size INTEGER NOT NULL,
+      title BLOB NOT NULL,
+      question BLOB NOT NULL,
+      answer BLOB NOT NULL,
+      provider BLOB,
+      model BLOB,
+      screenshot BLOB NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS history_created_at_idx
+      ON history (created_at DESC);
+  `)
+  const columns = database.pragma('table_info(history)') as Array<{ name: string }>
+  if (!columns.some((column) => column.name === 'response_style')) {
+    database.exec(`
+      ALTER TABLE history
+      ADD COLUMN response_style TEXT NOT NULL DEFAULT 'full-reply'
+        CHECK (response_style IN ('code-only', 'full-reply'))
+    `)
+  }
 }
 
 export class HistoryVault {
@@ -36,22 +74,7 @@ export class HistoryVault {
     this.database = new Database(databasePath)
     this.database.pragma('journal_mode = WAL')
     this.database.pragma('secure_delete = ON')
-    this.database.exec(`
-      CREATE TABLE IF NOT EXISTS history (
-        id TEXT PRIMARY KEY,
-        created_at TEXT NOT NULL,
-        mode TEXT NOT NULL CHECK (mode IN ('fast', 'deep')),
-        byte_size INTEGER NOT NULL,
-        title BLOB NOT NULL,
-        question BLOB NOT NULL,
-        answer BLOB NOT NULL,
-        provider BLOB,
-        model BLOB,
-        screenshot BLOB NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS history_created_at_idx
-        ON history (created_at DESC);
-    `)
+    ensureHistorySchema(this.database)
   }
 
   async initialize(): Promise<void> {
@@ -66,6 +89,7 @@ export class HistoryVault {
 
   async add(input: {
     mode: AnalysisMode
+    codeResponseStyle: CodeResponseStyle
     title: string
     question: string
     answer: string
@@ -92,13 +116,14 @@ export class HistoryVault {
     this.database
       .prepare(
         `INSERT INTO history
-          (id, created_at, mode, byte_size, title, question, answer, provider, model, screenshot)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, created_at, mode, response_style, byte_size, title, question, answer, provider, model, screenshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
         new Date().toISOString(),
         input.mode,
+        input.codeResponseStyle,
         byteSize,
         encryptedTitle,
         encryptedQuestion,
@@ -138,6 +163,7 @@ export class HistoryVault {
             id: row.id,
             createdAt: row.created_at,
             mode: row.mode,
+            codeResponseStyle: codeResponseStyleSchema.parse(row.response_style),
             title,
             byteSize: row.byte_size,
             ...(row.provider
@@ -163,6 +189,7 @@ export class HistoryVault {
       id: row.id,
       createdAt: row.created_at,
       mode: row.mode,
+      codeResponseStyle: codeResponseStyleSchema.parse(row.response_style),
       title: decryptText(row.title, this.requireKey()),
       question: decryptText(row.question, this.requireKey()),
       answer: decryptText(row.answer, this.requireKey()),
@@ -177,6 +204,12 @@ export class HistoryVault {
 
   delete(id: string): boolean {
     return this.database.prepare('DELETE FROM history WHERE id = ?').run(id).changes > 0
+  }
+
+  updateCodeResponseStyle(id: string, style: CodeResponseStyle): boolean {
+    return this.database
+      .prepare('UPDATE history SET response_style = ? WHERE id = ?')
+      .run(codeResponseStyleSchema.parse(style), id).changes > 0
   }
 
   pruneOlderThan(days: number | null): number {
@@ -214,7 +247,7 @@ export class HistoryVault {
       '',
       '## Answer',
       '',
-      record.answer,
+      visibleAnswerMarkdown(record.answer, record.codeResponseStyle),
       ''
     ].join('\n')
     await writeFile(path, markdown, { mode: 0o600 })

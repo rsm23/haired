@@ -36,11 +36,17 @@ const api = {
   clearHistory: (): Result<unknown> => ipcRenderer.invoke('history:clear'),
   exportHistory: (id: string): Result<unknown> =>
     ipcRenderer.invoke('history:export', id),
+  setHistoryCodeResponseStyle: (id: string, style: string): Result<unknown> =>
+    ipcRenderer.invoke('history:set-code-response-style', id, style),
   rerunHistory: (id: string): Result<unknown> => ipcRenderer.invoke('history:rerun', id),
   copyOverlay: (id: string): Result<unknown> => ipcRenderer.invoke('overlay:copy', id),
   exportOverlay: (id: string): Result<unknown> => ipcRenderer.invoke('overlay:export', id),
   pinOverlay: (id: string, pinned: boolean): Result<unknown> =>
     ipcRenderer.invoke('overlay:pin', id, pinned),
+  setOverlayCodeResponseStyle: (id: string, style: string): Result<unknown> =>
+    ipcRenderer.invoke('overlay:set-code-response-style', id, style),
+  setOverlayColumnCount: (id: string, columnCount: number): Result<unknown> =>
+    ipcRenderer.invoke('overlay:set-column-count', id, columnCount),
   closeOverlay: (id: string): Result<unknown> => ipcRenderer.invoke('overlay:close', id),
   followUp: (id: string, prompt: string): Result<unknown> =>
     ipcRenderer.invoke('overlay:follow-up', id, prompt),

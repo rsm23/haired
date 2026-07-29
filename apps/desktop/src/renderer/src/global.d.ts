@@ -1,6 +1,7 @@
 import type {
   AnalysisMode,
   AppSettings,
+  CodeResponseStyle,
   HistorySummary,
   LocalHistoryRecord,
   ProviderId,
@@ -53,10 +54,22 @@ export interface HairedApi {
   deleteHistory(id: string): IpcResult<boolean>
   clearHistory(): IpcResult<boolean>
   exportHistory(id: string): IpcResult<boolean>
+  setHistoryCodeResponseStyle(
+    id: string,
+    style: CodeResponseStyle
+  ): IpcResult<CodeResponseStyle>
   rerunHistory(id: string): IpcResult<{ id: string }>
   copyOverlay(id: string): IpcResult<unknown>
   exportOverlay(id: string): IpcResult<unknown>
   pinOverlay(id: string, pinned: boolean): IpcResult<boolean>
+  setOverlayCodeResponseStyle(
+    id: string,
+    style: CodeResponseStyle
+  ): IpcResult<CodeResponseStyle>
+  setOverlayColumnCount(
+    id: string,
+    columnCount: number
+  ): IpcResult<{ x: number; y: number; width: number; height: number }>
   closeOverlay(id: string): IpcResult<unknown>
   followUp(id: string, prompt: string): IpcResult<unknown>
   runPrivacyDiagnostic(): IpcResult<{
@@ -69,9 +82,14 @@ export interface HairedApi {
     id: string
     question: string
     mode: AnalysisMode
+    codeResponseStyle: CodeResponseStyle
+    columnWidth: number
   }) => void): Unsubscribe
   onOverlayEvent(listener: (payload: StreamEvent) => void): Unsubscribe
-  onOverlayReset(listener: (payload: { question: string }) => void): Unsubscribe
+  onOverlayReset(listener: (payload: {
+    question: string
+    codeResponseStyle: CodeResponseStyle
+  }) => void): Unsubscribe
 }
 
 declare global {

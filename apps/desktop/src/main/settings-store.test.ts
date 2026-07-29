@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   appSettingsSchema,
@@ -5,7 +8,7 @@ import {
   LEGACY_DEFAULT_INSTRUCTION,
   PREVIOUS_DEFAULT_INSTRUCTION
 } from '@haired/contracts'
-import { migrateBuiltInInstruction } from './settings-store'
+import { migrateBuiltInInstruction, SettingsStore } from './settings-store'
 
 describe('settings migration', () => {
   it.each([LEGACY_DEFAULT_INSTRUCTION, PREVIOUS_DEFAULT_INSTRUCTION])(
@@ -25,5 +28,19 @@ describe('settings migration', () => {
     })
 
     expect(migrateBuiltInInstruction(settings)).toBe(settings)
+  })
+
+  it('persists the code-response preference across store instances', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'haired-settings-'))
+    const settingsPath = path.join(directory, 'settings.json')
+    try {
+      const first = new SettingsStore(settingsPath)
+      await first.update({ codeResponseStyle: 'code-only' })
+
+      const relaunched = new SettingsStore(settingsPath)
+      expect((await relaunched.load()).codeResponseStyle).toBe('code-only')
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 })

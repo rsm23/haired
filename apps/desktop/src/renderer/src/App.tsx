@@ -1,6 +1,7 @@
 import {
   useEffect,
   useDeferredValue,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   ArrowRight,
   Cable,
+  ChevronLeft,
   ChevronRight,
   CircleCheck,
   CircleOff,
@@ -51,6 +53,7 @@ import type {
   AnalysisMode,
   AppSettings,
   CliReasoningSetting,
+  CodeResponseStyle,
   HistorySummary,
   LocalHistoryRecord,
   ProviderId,
@@ -139,6 +142,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { visibleAnswerMarkdown } from '../../shared/code-response'
 import type { BootstrapData, HairedApi } from './global'
 
 type Page = 'providers' | 'shortcuts' | 'appearance' | 'privacy' | 'history'
@@ -166,10 +170,13 @@ const unavailableApi: HairedApi = {
   deleteHistory: async () => ({ ok: false, error: bridgeError }),
   clearHistory: async () => ({ ok: false, error: bridgeError }),
   exportHistory: async () => ({ ok: false, error: bridgeError }),
+  setHistoryCodeResponseStyle: async () => ({ ok: false, error: bridgeError }),
   rerunHistory: async () => ({ ok: false, error: bridgeError }),
   copyOverlay: async () => ({ ok: false, error: bridgeError }),
   exportOverlay: async () => ({ ok: false, error: bridgeError }),
   pinOverlay: async () => ({ ok: false, error: bridgeError }),
+  setOverlayCodeResponseStyle: async () => ({ ok: false, error: bridgeError }),
+  setOverlayColumnCount: async () => ({ ok: false, error: bridgeError }),
   closeOverlay: async () => ({ ok: false, error: bridgeError }),
   followUp: async () => ({ ok: false, error: bridgeError }),
   runPrivacyDiagnostic: async () => ({ ok: false, error: bridgeError }),
@@ -1133,6 +1140,30 @@ function AppearancePage({
             <Separator />
             <Field orientation="horizontal">
               <div>
+                <FieldTitle id="code-response-style-label">Code answers</FieldTitle>
+                <FieldDescription>
+                  Show every complete code block alone, or keep the provider’s full reply.
+                </FieldDescription>
+              </div>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="lg"
+                value={settings.codeResponseStyle}
+                onValueChange={(value) => {
+                  if (value === 'code-only' || value === 'full-reply') {
+                    void update({ codeResponseStyle: value }, 'Code answer style saved.')
+                  }
+                }}
+                aria-labelledby="code-response-style-label"
+              >
+                <ToggleGroupItem value="code-only">Code only</ToggleGroupItem>
+                <ToggleGroupItem value="full-reply">Full reply</ToggleGroupItem>
+              </ToggleGroup>
+            </Field>
+            <Separator />
+            <Field orientation="horizontal">
+              <div>
                 <FieldTitle id="overlay-opacity-label">Overlay opacity</FieldTitle>
                 <FieldDescription>
                   {Math.round(settings.overlayOpacity * 100)}% opaque
@@ -1415,6 +1446,34 @@ function HistoryPage({ bootstrap }: { bootstrap: BootstrapData }) {
     }
   }
 
+  async function updateRecordCodeResponseStyle(style: CodeResponseStyle) {
+    if (!record || record.codeResponseStyle === style) return
+    const previous = record.codeResponseStyle
+    setRecord({ ...record, codeResponseStyle: style })
+    setItems((current) =>
+      current.map((item) =>
+        item.id === record.id ? { ...item, codeResponseStyle: style } : item
+      )
+    )
+    try {
+      await unwrap(await api.setHistoryCodeResponseStyle(record.id, style))
+    } catch (cause) {
+      setRecord((current) =>
+        current?.id === record.id
+          ? { ...current, codeResponseStyle: previous }
+          : current
+      )
+      setItems((current) =>
+        current.map((item) =>
+          item.id === record.id
+            ? { ...item, codeResponseStyle: previous }
+            : item
+        )
+      )
+      toast.error(messageOf(cause))
+    }
+  }
+
   return (
     <div className="page history-page">
       <div className="history-heading">
@@ -1558,28 +1617,45 @@ function HistoryPage({ bootstrap }: { bootstrap: BootstrapData }) {
                 <CardTitle>{record.title}</CardTitle>
                 <CardDescription>{formatDateTime(record.createdAt)}</CardDescription>
                 <CardAction>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="History actions">
-                        <MoreHorizontal />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem onSelect={() => void api.exportHistory(record.id)}>
-                          <Download />
-                          Export
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onSelect={() => void remove(record.id)}
-                        >
-                          <Trash2 />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="history-record-actions">
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      size="sm"
+                      value={record.codeResponseStyle}
+                      onValueChange={(value) => {
+                        if (value === 'code-only' || value === 'full-reply') {
+                          void updateRecordCodeResponseStyle(value)
+                        }
+                      }}
+                      aria-label="History answer view"
+                    >
+                      <ToggleGroupItem value="code-only">Code only</ToggleGroupItem>
+                      <ToggleGroupItem value="full-reply">Full reply</ToggleGroupItem>
+                    </ToggleGroup>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label="History actions">
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem onSelect={() => void api.exportHistory(record.id)}>
+                            <Download />
+                            Export
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onSelect={() => void remove(record.id)}
+                          >
+                            <Trash2 />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </CardAction>
               </CardHeader>
               <CardContent className="preview-content">
@@ -1594,7 +1670,9 @@ function HistoryPage({ bootstrap }: { bootstrap: BootstrapData }) {
                 </section>
                 <Separator />
                 <section className="markdown preview-answer">
-                  <MarkdownAnswer>{record.answer}</MarkdownAnswer>
+                  <MarkdownAnswer>
+                    {visibleAnswerMarkdown(record.answer, record.codeResponseStyle)}
+                  </MarkdownAnswer>
                 </section>
               </CardContent>
               <CardFooter className="preview-actions">
@@ -1795,18 +1873,42 @@ function AnswerOverlay({ id }: { id: string }) {
   const opacity = Number(new URLSearchParams(window.location.search).get('opacity') ?? 0.9)
   const [question, setQuestion] = useState('Preparing your question…')
   const [mode, setMode] = useState<AnalysisMode>('fast')
+  const [codeResponseStyle, setCodeResponseStyle] =
+    useState<CodeResponseStyle>('full-reply')
+  const [columnWidth, setColumnWidth] = useState(520)
+  const [columnCount, setColumnCount] = useState(1)
+  const [currentColumn, setCurrentColumn] = useState(1)
+  const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false)
   const [answer, setAnswer] = useState('')
   const [status, setStatus] = useState<'thinking' | 'complete' | 'error'>('thinking')
   const [error, setError] = useState('')
   const [pinned, setPinned] = useState(false)
   const [followUp, setFollowUp] = useState('')
+  const answerViewportRef = useRef<HTMLDivElement>(null)
+  const answerPagesRef = useRef<HTMLDivElement>(null)
+  const reportedColumnCount = useRef(0)
+  const columnSnapTimer = useRef<number | null>(null)
+  const visibleAnswer = useMemo(
+    () =>
+      visibleAnswerMarkdown(
+        answer,
+        codeResponseStyle,
+        status === 'complete' || status === 'error'
+      ),
+    [answer, codeResponseStyle, status]
+  )
 
   useEffect(() => {
     const removeInit = api.onOverlayInit((payload) => {
       setQuestion(payload.question)
       setMode(payload.mode)
+      setCodeResponseStyle(payload.codeResponseStyle)
+      setColumnWidth(payload.columnWidth)
       setAnswer('')
       setStatus('thinking')
+      setError('')
+      reportedColumnCount.current = 0
+      answerViewportRef.current?.scrollTo({ left: 0 })
     })
     const removeEvent = api.onOverlayEvent((event: StreamEvent) => {
       if (event.type === 'started') setStatus('thinking')
@@ -1819,10 +1921,13 @@ function AnswerOverlay({ id }: { id: string }) {
     })
     const removeReset = api.onOverlayReset((payload) => {
       setQuestion(payload.question)
+      setCodeResponseStyle(payload.codeResponseStyle)
       setAnswer('')
       setStatus('thinking')
       setError('')
       setFollowUp('')
+      reportedColumnCount.current = 0
+      answerViewportRef.current?.scrollTo({ left: 0 })
     })
     return () => {
       removeInit()
@@ -1830,6 +1935,94 @@ function AnswerOverlay({ id }: { id: string }) {
       removeReset()
     }
   }, [])
+
+  useLayoutEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const pages = answerPagesRef.current
+      const nextCount = Math.max(
+        1,
+        Math.min(100, Math.ceil((pages?.scrollWidth ?? columnWidth) / columnWidth))
+      )
+      setColumnCount(nextCount)
+      if (reportedColumnCount.current !== nextCount) {
+        reportedColumnCount.current = nextCount
+        void api
+          .setOverlayColumnCount(id, nextCount)
+          .then((result) => {
+            if (!result.ok) throw new Error(result.error)
+          })
+          .catch((cause) => toast.error(messageOf(cause)))
+      }
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [columnWidth, id, visibleAnswer])
+
+  useEffect(() => {
+    const updatePagination = () => {
+      const viewport = answerViewportRef.current
+      if (!viewport) return
+      setHasHorizontalOverflow(viewport.scrollWidth > viewport.clientWidth + 1)
+      setCurrentColumn(
+        Math.min(
+          columnCount,
+          Math.max(1, Math.round(viewport.scrollLeft / columnWidth) + 1)
+        )
+      )
+    }
+    updatePagination()
+    window.addEventListener('resize', updatePagination)
+    return () => window.removeEventListener('resize', updatePagination)
+  }, [columnCount, columnWidth, visibleAnswer])
+
+  useEffect(
+    () => () => {
+      if (columnSnapTimer.current !== null) {
+        window.clearTimeout(columnSnapTimer.current)
+      }
+    },
+    []
+  )
+
+  async function updateOverlayCodeResponseStyle(style: CodeResponseStyle) {
+    if (style === codeResponseStyle) return
+    const previous = codeResponseStyle
+    setCodeResponseStyle(style)
+    answerViewportRef.current?.scrollTo({ left: 0 })
+    try {
+      await unwrap(await api.setOverlayCodeResponseStyle(id, style))
+    } catch (cause) {
+      setCodeResponseStyle(previous)
+      toast.error(messageOf(cause))
+    }
+  }
+
+  function scrollAnswerColumns(direction: -1 | 1) {
+    answerViewportRef.current?.scrollBy({
+      left: direction * columnWidth,
+      behavior: 'smooth'
+    })
+  }
+
+  function handleAnswerScroll() {
+    const viewport = answerViewportRef.current
+    if (!viewport) return
+    setCurrentColumn(
+      Math.min(
+        columnCount,
+        Math.max(1, Math.round(viewport.scrollLeft / columnWidth) + 1)
+      )
+    )
+    setHasHorizontalOverflow(viewport.scrollWidth > viewport.clientWidth + 1)
+    if (columnSnapTimer.current !== null) {
+      window.clearTimeout(columnSnapTimer.current)
+    }
+    columnSnapTimer.current = window.setTimeout(() => {
+      const nextLeft = Math.round(viewport.scrollLeft / columnWidth) * columnWidth
+      if (Math.abs(nextLeft - viewport.scrollLeft) > 1) {
+        viewport.scrollTo({ left: nextLeft, behavior: 'smooth' })
+      }
+    }, 120)
+  }
 
   async function submitFollowUp(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key !== 'Enter' || !followUp.trim()) return
@@ -1863,6 +2056,22 @@ function AnswerOverlay({ id }: { id: string }) {
               Thinking
             </Badge>
           )}
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={codeResponseStyle}
+            onValueChange={(value) => {
+              if (value === 'code-only' || value === 'full-reply') {
+                void updateOverlayCodeResponseStyle(value)
+              }
+            }}
+            aria-label="Answer view"
+            className="overlay-view-toggle no-drag"
+          >
+            <ToggleGroupItem value="code-only">Code only</ToggleGroupItem>
+            <ToggleGroupItem value="full-reply">Full reply</ToggleGroupItem>
+          </ToggleGroup>
         </div>
         <div className="overlay-window-actions no-drag">
           <Tooltip>
@@ -1901,16 +2110,32 @@ function AnswerOverlay({ id }: { id: string }) {
         <span>QUESTION</span>
         <p>{question}</p>
       </section>
-      <ScrollArea className="overlay-answer">
-        <div className="markdown">
-          {status === 'thinking' && !answer && (
+      <div
+        className="overlay-answer no-drag"
+        ref={answerViewportRef}
+        tabIndex={0}
+        aria-label="Paginated answer"
+        onScroll={handleAnswerScroll}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault()
+            scrollAnswerColumns(event.key === 'ArrowLeft' ? -1 : 1)
+          }
+        }}
+      >
+        <div
+          className="overlay-pages markdown"
+          ref={answerPagesRef}
+          style={{ '--answer-column-width': `${columnWidth}px` } as CSSProperties}
+        >
+          {status === 'thinking' && !visibleAnswer && (
             <div className="overlay-skeleton" aria-label="Generating answer">
               <Skeleton />
               <Skeleton />
               <Skeleton />
             </div>
           )}
-          {answer && <MarkdownAnswer>{answer}</MarkdownAnswer>}
+          {visibleAnswer && <MarkdownAnswer>{visibleAnswer}</MarkdownAnswer>}
           {status === 'error' && (
             <Alert variant="destructive">
               <EyeOff />
@@ -1919,7 +2144,7 @@ function AnswerOverlay({ id }: { id: string }) {
             </Alert>
           )}
         </div>
-      </ScrollArea>
+      </div>
       <footer className="overlay-bottom no-drag">
         <InputGroup>
           <InputGroupAddon>
@@ -1950,6 +2175,33 @@ function AnswerOverlay({ id }: { id: string }) {
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
+        {hasHorizontalOverflow && (
+          <div className="overlay-page-controls" aria-label="Answer pages">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Previous answer column"
+              disabled={currentColumn <= 1}
+              onClick={() => scrollAnswerColumns(-1)}
+            >
+              <ChevronLeft />
+            </Button>
+            <span aria-live="polite">
+              {currentColumn} / {columnCount}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Next answer column"
+              disabled={currentColumn >= columnCount}
+              onClick={() => scrollAnswerColumns(1)}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

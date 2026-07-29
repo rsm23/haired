@@ -11,6 +11,7 @@ import type {
   StreamEvent
 } from '@haired/contracts'
 import {
+  CODE_ONLY_ANSWER_INSTRUCTION,
   CODE_ANSWER_INSTRUCTION,
   providerIdSchema,
   reasoningEffortSchema,
@@ -103,7 +104,8 @@ function buildPrompt(metadata: AnalysisMetadata): string {
       : 'Answer the user’s explicit question using the selected screen as context.'
   const responseRequirements = [
     metadata.prompt.includes(SCREEN_TASK_INSTRUCTION) ? '' : SCREEN_TASK_INSTRUCTION,
-    metadata.prompt.includes(CODE_ANSWER_INSTRUCTION) ? '' : CODE_ANSWER_INSTRUCTION
+    metadata.prompt.includes(CODE_ANSWER_INSTRUCTION) ? '' : CODE_ANSWER_INSTRUCTION,
+    metadata.codeResponseStyle === 'code-only' ? CODE_ONLY_ANSWER_INSTRUCTION : ''
   ]
     .filter(Boolean)
     .join('\n\n')

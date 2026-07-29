@@ -171,6 +171,22 @@ describe('provider manager', () => {
     expect(prompt).toContain('`typescript`')
   })
 
+  it('requests prose-free fenced blocks only in code-only mode', () => {
+    const base = {
+      requestId: crypto.randomUUID(),
+      mode: 'fast' as const,
+      prompt: 'Implement the visible task',
+      conversation: []
+    }
+
+    expect(
+      providerInternals.buildPrompt({ ...base, codeResponseStyle: 'code-only' })
+    ).toContain('return only complete fenced Markdown code blocks')
+    expect(
+      providerInternals.buildPrompt({ ...base, codeResponseStyle: 'full-reply' })
+    ).not.toContain('return only complete fenced Markdown code blocks')
+  })
+
   it('treats a one-click programming exercise as a task to solve', () => {
     const prompt = providerInternals.buildPrompt({
       requestId: crypto.randomUUID(),

@@ -13,17 +13,18 @@ import {
   screen,
   shell,
   systemPreferences,
-  type BrowserWindow,
-  type Rectangle
+  type BrowserWindow
 } from 'electron'
 import {
   appSettingsSchema,
   captureRegionSchema,
+  codeResponseStyleSchema,
   providerIdSchema,
   type AnalysisMetadata,
   type AnalysisMode,
   type AppSettings,
   type CaptureRegion,
+  type CodeResponseStyle,
   type StreamEvent
 } from '@haired/contracts'
 import {
@@ -33,14 +34,27 @@ import {
 } from './capture'
 import { HistoryVault } from './history'
 import { isTrustedRendererUrl } from './ipc-trust'
+import {
+  installClosedOutputGuards,
+  sendToRenderer
+} from './main-process-safety'
+import {
+  boundsForOverlayColumns,
+  createOverlayLayout,
+  parseOverlayColumnCount,
+  type OverlayLayout
+} from './overlay-layout'
 import { ProviderManager } from './provider-manager'
 import { prepareRelaunchEnvironment } from './relaunch'
 import { ProtectedFile } from './secure-storage'
 import { SettingsStore } from './settings-store'
 import { configureUpdates, setUpdateBusy } from './updater'
 import { createProtectedWindow, loadRenderer } from './windows'
+import { visibleAnswerMarkdown } from '../shared/code-response'
 
 type CaptureMode = 'instant' | 'ask'
+
+installClosedOutputGuards()
 
 interface CaptureSession {
   capture: CapturedDisplay
@@ -53,6 +67,7 @@ interface OverlaySession {
   window: BrowserWindow
   image: Buffer
   mode: AnalysisMode
+  codeResponseStyle: CodeResponseStyle
   question: string
   answer: string
   pinned: boolean
@@ -60,7 +75,9 @@ interface OverlaySession {
   controller: AbortController | null
   provider?: string
   model?: string
+  historyId: string | null
   interaction: CaptureMode
+  layout: OverlayLayout
 }
 
 const singleInstance = app.requestSingleInstanceLock()
@@ -150,7 +167,7 @@ async function showSettings(page = 'providers'): Promise<void> {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show()
     settingsWindow.focus()
-    settingsWindow.webContents.send('settings:navigate', page)
+    sendToRenderer(settingsWindow, 'settings:navigate', page)
     return
   }
   const window = createProtectedWindow({
@@ -285,25 +302,6 @@ function startCaptureFromShortcut(mode: CaptureMode): void {
   })
 }
 
-function overlayBounds(displayBounds: Rectangle, region: CaptureRegion): Rectangle {
-  const width = Math.min(580, Math.max(440, displayBounds.width * 0.38))
-  const height = Math.min(610, Math.max(390, displayBounds.height * 0.58))
-  const preferredRight = displayBounds.x + region.x + region.width + 16
-  const preferredBelow = displayBounds.y + region.y + region.height + 16
-  const x =
-    preferredRight + width <= displayBounds.x + displayBounds.width
-      ? preferredRight
-      : Math.max(displayBounds.x + 16, displayBounds.x + region.x - width - 16)
-  const y =
-    displayBounds.y + region.y + height <= displayBounds.y + displayBounds.height
-      ? displayBounds.y + region.y
-      : Math.max(
-          displayBounds.y + 16,
-          Math.min(preferredBelow, displayBounds.y + displayBounds.height - height - 16)
-        )
-  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }
-}
-
 function closeUnpinnedOverlays(): void {
   for (const [id, overlay] of overlays) {
     if (!overlay.pinned) closeOverlay(id)
@@ -325,6 +323,7 @@ async function createOverlay(input: {
   image: Buffer
   question: string
   mode: AnalysisMode
+  codeResponseStyle: CodeResponseStyle
   interaction?: CaptureMode
   conversation?: OverlaySession['conversation']
 }): Promise<OverlaySession> {
@@ -338,10 +337,15 @@ async function createOverlay(input: {
     }
   }
   const id = randomUUID()
+  const layout = createOverlayLayout(
+    input.capture.display.bounds,
+    input.capture.display.workArea,
+    input.region
+  )
   const window = createProtectedWindow({
     kind: 'overlay',
     preload: preloadPath(),
-    bounds: overlayBounds(input.capture.display.bounds, input.region),
+    bounds: layout.bounds,
     query: {}
   })
   const overlay: OverlaySession = {
@@ -349,12 +353,15 @@ async function createOverlay(input: {
     window,
     image: input.image,
     mode: input.mode,
+    codeResponseStyle: input.codeResponseStyle,
     question: input.question,
     answer: '',
     pinned: false,
     interaction: input.interaction ?? 'ask',
     conversation: input.conversation ?? [],
-    controller: null
+    controller: null,
+    layout,
+    historyId: null
   }
   overlays.set(id, overlay)
   activeOverlayId = id
@@ -366,10 +373,12 @@ async function createOverlay(input: {
   })
   window.once('ready-to-show', () => {
     window.showInactive()
-    window.webContents.send('overlay:init', {
+    sendToRenderer(window, 'overlay:init', {
       id,
       question: input.question,
-      mode: input.mode
+      mode: input.mode,
+      codeResponseStyle: input.codeResponseStyle,
+      columnWidth: layout.columnWidth
     })
   })
   const opacity = (await settingsStore.load()).overlayOpacity
@@ -382,9 +391,11 @@ async function streamOverlay(overlay: OverlaySession): Promise<void> {
   const controller = new AbortController()
   overlay.controller = controller
   overlay.answer = ''
+  overlay.historyId = null
   const metadata: AnalysisMetadata = {
     requestId: randomUUID(),
     mode: overlay.mode,
+    codeResponseStyle: overlay.codeResponseStyle,
     interaction: overlay.interaction,
     prompt: overlay.question,
     conversation: overlay.conversation
@@ -399,7 +410,7 @@ async function streamOverlay(overlay: OverlaySession): Promise<void> {
       overlay.model = event.model
     }
     if (event.type === 'completed') completed = true
-    overlay.window.webContents.send('overlay:event', event)
+    sendToRenderer(overlay.window, 'overlay:event', event)
   }
   try {
     await providerManager.analyze({
@@ -409,8 +420,10 @@ async function streamOverlay(overlay: OverlaySession): Promise<void> {
       signal: controller.signal
     })
     if (completed && overlay.answer.trim()) {
-      await historyVault.add({
+      const savedStyle = overlay.codeResponseStyle
+      overlay.historyId = await historyVault.add({
         mode: overlay.mode,
+        codeResponseStyle: savedStyle,
         title: overlay.question.trim().slice(0, 72) || 'Screen analysis',
         question: overlay.question,
         answer: overlay.answer,
@@ -418,6 +431,12 @@ async function streamOverlay(overlay: OverlaySession): Promise<void> {
         ...(overlay.provider ? { provider: overlay.provider } : {}),
         ...(overlay.model ? { model: overlay.model } : {})
       })
+      if (overlay.codeResponseStyle !== savedStyle) {
+        historyVault.updateCodeResponseStyle(
+          overlay.historyId,
+          overlay.codeResponseStyle
+        )
+      }
     }
   } catch (error) {
     if (!controller.signal.aborted) {
@@ -453,6 +472,7 @@ async function completeSelection(raw: unknown): Promise<{ id: string }> {
     image,
     question,
     mode: settings.defaultMode,
+    codeResponseStyle: settings.codeResponseStyle,
     interaction: mode
   })
   void streamOverlay(overlay)
@@ -616,6 +636,14 @@ function registerIpc(): void {
       finishBusy()
     }
   })
+  handle('history:set-code-response-style', (_event, id, rawStyle) => {
+    if (typeof id !== 'string') throw new Error('Invalid history item')
+    const style = codeResponseStyleSchema.parse(rawStyle)
+    if (!historyVault.updateCodeResponseStyle(id, style)) {
+      throw new Error('History item was not found')
+    }
+    return style
+  })
   handle('history:rerun', async (_event, id) => {
     if (typeof id !== 'string') throw new Error('Invalid history item')
     const record = historyVault.get(id)
@@ -632,7 +660,8 @@ function registerIpc(): void {
       },
       image,
       question: record.question,
-      mode: record.mode
+      mode: record.mode,
+      codeResponseStyle: record.codeResponseStyle
     })
     void streamOverlay(overlay)
     return { id: overlay.id }
@@ -640,7 +669,9 @@ function registerIpc(): void {
   handle('overlay:copy', (_event, id) => {
     const overlay = typeof id === 'string' ? overlays.get(id) : undefined
     if (!overlay) throw new Error('Answer is no longer available')
-    clipboard.writeText(overlay.answer)
+    clipboard.writeText(
+      visibleAnswerMarkdown(overlay.answer, overlay.codeResponseStyle)
+    )
     return true
   })
   handle('overlay:export', async (_event, id) => {
@@ -663,7 +694,7 @@ function registerIpc(): void {
         '',
         '## Answer',
         '',
-        overlay.answer,
+        visibleAnswerMarkdown(overlay.answer, overlay.codeResponseStyle),
         ''
       ].join('\n')
       await writeFile(result.filePath, markdown, { mode: 0o600 })
@@ -682,6 +713,24 @@ function registerIpc(): void {
     overlay.pinned = Boolean(pinned)
     return overlay.pinned
   })
+  handle('overlay:set-code-response-style', (_event, id, rawStyle) => {
+    const overlay = typeof id === 'string' ? overlays.get(id) : undefined
+    if (!overlay) throw new Error('Answer is no longer available')
+    const style = codeResponseStyleSchema.parse(rawStyle)
+    overlay.codeResponseStyle = style
+    if (overlay.historyId) historyVault.updateCodeResponseStyle(overlay.historyId, style)
+    return style
+  })
+  handle('overlay:set-column-count', (_event, id, rawColumnCount) => {
+    const overlay = typeof id === 'string' ? overlays.get(id) : undefined
+    if (!overlay) throw new Error('Answer is no longer available')
+    const bounds = boundsForOverlayColumns(
+      overlay.layout,
+      parseOverlayColumnCount(rawColumnCount)
+    )
+    if (!overlay.window.isDestroyed()) overlay.window.setBounds(bounds)
+    return bounds
+  })
   handle('overlay:close', (_event, id) => {
     if (typeof id === 'string') closeOverlay(id)
     return true
@@ -699,7 +748,13 @@ function registerIpc(): void {
     overlay.question = prompt
     overlay.interaction = 'ask'
     overlay.answer = ''
-    overlay.window.webContents.send('overlay:reset', { question: prompt })
+    overlay.historyId = null
+    if (!sendToRenderer(overlay.window, 'overlay:reset', {
+      question: prompt,
+      codeResponseStyle: overlay.codeResponseStyle
+    })) {
+      throw new Error('Answer is no longer available')
+    }
     void streamOverlay(overlay)
     return true
   })
