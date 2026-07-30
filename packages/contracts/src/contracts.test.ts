@@ -19,6 +19,7 @@ describe('shared contracts', () => {
     expect(settings.launchAtLogin).toBe(false)
     expect(settings.magnifyingGlassCursor).toBe(false)
     expect(settings.historyAutoDeleteDays).toBeNull()
+    expect(settings.shortcuts.moveOverlay).toBe('CommandOrControl+Alt')
     expect(settings.defaultInstruction).toBe(DEFAULT_INSTRUCTION)
     expect(settings.defaultInstruction).toContain(CODE_ANSWER_INSTRUCTION)
     expect(settings.defaultInstruction).toContain(SCREEN_TASK_INSTRUCTION)

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   boundsForOverlayColumns,
   createOverlayLayout,
+  moveOverlayBounds,
   overlayBoundsChanged,
   parseOverlayColumnCount
 } from './overlay-layout'
@@ -84,5 +85,36 @@ describe('answer overlay layout', () => {
 
     expect(overlayBoundsChanged(current, { ...current })).toBe(false)
     expect(overlayBoundsChanged(current, { ...current, width: 540 })).toBe(true)
+  })
+
+  it('moves the answer window in fixed arrow-key steps', () => {
+    const current = { x: 500, y: 200, width: 540, height: 600 }
+    const movedLeft = moveOverlayBounds(current, workArea, 'left')
+
+    expect(movedLeft).toMatchObject({
+      x: 476,
+      y: 200
+    })
+    expect(moveOverlayBounds(movedLeft, workArea, 'right')).toEqual(current)
+    expect(moveOverlayBounds(current, workArea, 'down')).toMatchObject({
+      x: 500,
+      y: 224
+    })
+  })
+
+  it('keeps horizontal movement on-screen and the full-height header recoverable', () => {
+    const current = { x: 112, y: 86, width: 540, height: 826 }
+
+    expect(moveOverlayBounds(current, workArea, 'left')).toEqual(current)
+    expect(moveOverlayBounds(current, workArea, 'up')).toEqual(current)
+    expect(
+      moveOverlayBounds({ ...current, x: 988 }, workArea, 'right')
+    ).toMatchObject({ x: 988 })
+    expect(
+      moveOverlayBounds({ ...current, y: 86 }, workArea, 'down')
+    ).toMatchObject({ y: 110 })
+    expect(
+      moveOverlayBounds({ ...current, y: 900 }, workArea, 'down')
+    ).toMatchObject({ y: 828 })
   })
 })

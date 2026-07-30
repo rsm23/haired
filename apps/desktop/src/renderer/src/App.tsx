@@ -29,6 +29,7 @@ import {
   History,
   LogOut,
   MoreHorizontal,
+  Move,
   Pin,
   Play,
   Plus,
@@ -146,6 +147,12 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { visibleAnswerMarkdown } from '../../shared/code-response'
+import {
+  acceleratorIdentity,
+  keyboardModifierToken,
+  normalizeMoveShortcut,
+  overlayMovementAccelerators
+} from '../../shared/shortcuts'
 import type { BootstrapData, HairedApi } from './global'
 import {
   answerColumnAt,
@@ -995,25 +1002,52 @@ function ShortcutsPage({
       title: 'Open settings',
       detail: 'Bring this protected window back without a tray icon.',
       icon: Settings2
+    },
+    {
+      id: 'moveOverlay',
+      title: 'Move answer window',
+      detail: 'Hold these modifier keys, then use the arrow keys to move the active answer window.',
+      icon: Move
     }
   ]
 
   const duplicateIds = useMemo(() => {
     const groups = new Map<string, ShortcutId[]>()
+    const isMac = navigator.platform.toLowerCase().includes('mac')
     for (const [id, shortcut] of Object.entries(draft) as Array<[ShortcutId, string]>) {
-      const key = shortcut.toLowerCase()
-      groups.set(key, [...(groups.get(key) ?? []), id])
+      const normalizedMoveShortcut =
+        id === 'moveOverlay' ? normalizeMoveShortcut(shortcut) : null
+      const accelerators =
+        id === 'moveOverlay' && normalizedMoveShortcut
+          ? overlayMovementAccelerators(normalizedMoveShortcut).map(
+              ([, accelerator]) => accelerator
+            )
+          : id === 'moveOverlay'
+            ? []
+            : [shortcut]
+      for (const accelerator of accelerators) {
+        const key = acceleratorIdentity(accelerator, isMac)
+        groups.set(key, [...(groups.get(key) ?? []), id])
+      }
     }
     return new Set([...groups.values()].filter((ids) => ids.length > 1).flat())
   }, [draft])
+  const moveShortcutValid = normalizeMoveShortcut(draft.moveOverlay) !== null
 
   useEffect(() => {
     if (!recording) return
-    const listener = (event: KeyboardEvent) => {
+    const pressedMoveModifiers = new Set<string>()
+    const isMac = navigator.platform.toLowerCase().includes('mac')
+    const keydownListener = (event: KeyboardEvent) => {
       event.preventDefault()
       event.stopPropagation()
       if (event.key === 'Escape') {
         setRecording(null)
+        return
+      }
+      if (recording === 'moveOverlay') {
+        const modifier = keyboardModifierToken(event.key, isMac)
+        if (modifier) pressedMoveModifiers.add(modifier)
         return
       }
       const shortcut = shortcutFromEvent(event)
@@ -1021,11 +1055,31 @@ function ShortcutsPage({
       setDraft((current) => ({ ...current, [recording]: shortcut }))
       setRecording(null)
     }
-    window.addEventListener('keydown', listener, true)
-    return () => window.removeEventListener('keydown', listener, true)
+    const keyupListener = (event: KeyboardEvent) => {
+      if (recording !== 'moveOverlay') return
+      event.preventDefault()
+      event.stopPropagation()
+      const modifier = keyboardModifierToken(event.key, isMac)
+      if (!modifier || !pressedMoveModifiers.has(modifier)) return
+      const shortcut = normalizeMoveShortcut([...pressedMoveModifiers].join('+'))
+      if (shortcut) {
+        setDraft((current) => ({ ...current, moveOverlay: shortcut }))
+        setRecording(null)
+      }
+    }
+    window.addEventListener('keydown', keydownListener, true)
+    window.addEventListener('keyup', keyupListener, true)
+    return () => {
+      window.removeEventListener('keydown', keydownListener, true)
+      window.removeEventListener('keyup', keyupListener, true)
+    }
   }, [recording])
 
   async function save() {
+    if (!moveShortcutValid) {
+      toast.error('Window movement needs one or more modifier keys.')
+      return
+    }
     if (duplicateIds.size > 0) {
       toast.error('Each action needs a different shortcut.')
       return
@@ -1054,20 +1108,23 @@ function ShortcutsPage({
       <PageHeading
         eyebrow="WORKFLOW"
         title="Keyboard shortcuts"
-        description="Click a shortcut, then press the exact key combination you want to use."
+        description="Set global actions and a modifier chord for moving the answer window."
       />
       <Card>
         <CardHeader>
           <CardTitle>Global actions</CardTitle>
           <CardDescription>
-            Include Command, Control, Option, or Shift plus one letter or action key.
+            Most actions use modifiers plus a key. For movement, hold the saved modifiers and press
+            an arrow key.
           </CardDescription>
         </CardHeader>
         <CardContent className="shortcut-list">
           {actions.map((action, index) => {
             const Icon = action.icon
             const conflict =
-              duplicateIds.has(action.id) || bootstrap.shortcuts[action.id] === false
+              duplicateIds.has(action.id) ||
+              bootstrap.shortcuts[action.id] === false ||
+              (action.id === 'moveOverlay' && !moveShortcutValid)
             return (
               <div key={action.id}>
                 {index > 0 && <Separator />}
@@ -1089,13 +1146,17 @@ function ShortcutsPage({
                       onClick={() => setRecording(action.id)}
                     >
                       {recording === action.id ? (
-                        'Press keys…'
+                        action.id === 'moveOverlay' ? 'Hold modifiers…' : 'Press keys…'
                       ) : (
                         <ShortcutKeys value={draft[action.id]} />
                       )}
                     </Button>
                     {conflict ? (
-                      <Badge variant="destructive">Conflict</Badge>
+                      <Badge variant="destructive">
+                        {action.id === 'moveOverlay' && !moveShortcutValid
+                          ? 'Invalid'
+                          : 'Conflict'}
+                      </Badge>
                     ) : (
                       <Badge variant="outline">Available</Badge>
                     )}
@@ -2684,7 +2745,9 @@ function normalizeSelection(a: Point, b: Point): Selection {
 
 function shortcutFromEvent(event: KeyboardEvent): string | null {
   const modifiers: string[] = []
-  if (event.metaKey || event.ctrlKey) modifiers.push('CommandOrControl')
+  const isMac = navigator.platform.toLowerCase().includes('mac')
+  if (event.metaKey) modifiers.push(isMac ? 'Command' : 'Super')
+  if (event.ctrlKey) modifiers.push(isMac ? 'Control' : 'CommandOrControl')
   if (event.altKey) modifiers.push('Alt')
   if (event.shiftKey) modifiers.push('Shift')
   if (modifiers.length === 0) return null
@@ -2711,11 +2774,15 @@ function shortcutFromEvent(event: KeyboardEvent): string | null {
 }
 
 function shortcutToken(token: string): string {
+  const isMac = navigator.platform.toLowerCase().includes('mac')
   if (token === 'CommandOrControl') {
-    return navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl'
+    return isMac ? '⌘' : 'Ctrl'
   }
+  if (token === 'Command') return isMac ? '⌘' : 'Cmd'
+  if (token === 'Control') return isMac ? '⌃' : 'Ctrl'
+  if (token === 'Super') return isMac ? '⌘' : '⊞'
   if (token === 'Shift') return '⇧'
-  if (token === 'Alt') return navigator.platform.toLowerCase().includes('mac') ? '⌥' : 'Alt'
+  if (token === 'Alt') return isMac ? '⌥' : 'Alt'
   if (token === 'Space') return 'Space'
   if (token === 'Enter') return '↵'
   return token

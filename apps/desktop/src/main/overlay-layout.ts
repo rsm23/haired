@@ -3,6 +3,8 @@ import type { CaptureRegion } from '@haired/contracts'
 
 const OVERLAY_MARGIN = 12
 const REGION_GAP = 16
+const OVERLAY_MINIMUM_VISIBLE_HEIGHT = 96
+export const OVERLAY_MOVE_STEP = 24
 
 export interface OverlayLayout {
   workArea: Rectangle
@@ -91,4 +93,33 @@ export function overlayBoundsChanged(
     current.width !== next.width ||
     current.height !== next.height
   )
+}
+
+export function moveOverlayBounds(
+  current: Rectangle,
+  workArea: Rectangle,
+  direction: 'up' | 'down' | 'left' | 'right',
+  step = OVERLAY_MOVE_STEP
+): Rectangle {
+  const leftEdge = workArea.x + OVERLAY_MARGIN
+  const topEdge = workArea.y + OVERLAY_MARGIN
+  const rightEdge = Math.max(
+    leftEdge,
+    workArea.x + workArea.width - OVERLAY_MARGIN - current.width
+  )
+  const bottomEdge = Math.max(
+    topEdge,
+    workArea.y +
+      workArea.height -
+      Math.min(current.height, OVERLAY_MINIMUM_VISIBLE_HEIGHT)
+  )
+  const horizontalDelta =
+    direction === 'left' ? -step : direction === 'right' ? step : 0
+  const verticalDelta =
+    direction === 'up' ? -step : direction === 'down' ? step : 0
+  return {
+    ...current,
+    x: Math.round(clamp(current.x + horizontalDelta, leftEdge, rightEdge)),
+    y: Math.round(clamp(current.y + verticalDelta, topEdge, bottomEdge))
+  }
 }

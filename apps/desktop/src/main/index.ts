@@ -41,10 +41,14 @@ import {
 import {
   boundsForOverlayColumns,
   createOverlayLayout,
+  moveOverlayBounds,
   overlayBoundsChanged,
   parseOverlayColumnCount,
   type OverlayLayout
 } from './overlay-layout'
+import {
+  HeldOverlayMovementRepeater
+} from './overlay-movement-repeat'
 import { ProviderManager } from './provider-manager'
 import { prepareRelaunchEnvironment } from './relaunch'
 import { ProtectedFile } from './secure-storage'
@@ -52,8 +56,14 @@ import { SettingsStore } from './settings-store'
 import { configureUpdates, setUpdateBusy } from './updater'
 import { createProtectedWindow, loadRenderer } from './windows'
 import { visibleAnswerMarkdown } from '../shared/code-response'
+import {
+  overlayMovementAccelerators,
+  type OverlayMoveDirection
+} from '../shared/shortcuts'
 
 type CaptureMode = 'instant' | 'ask'
+type ShortcutId = keyof AppSettings['shortcuts']
+type ShortcutState = Record<ShortcutId, boolean>
 
 installClosedOutputGuards()
 
@@ -97,11 +107,14 @@ let settingsStore: SettingsStore
 let historyVault: HistoryVault
 let providerManager: ProviderManager
 const overlays = new Map<string, OverlaySession>()
-let shortcutState: Record<'instant' | 'ask' | 'settings', boolean> = {
+let shortcutState: ShortcutState = {
   instant: false,
   ask: false,
-  settings: false
+  settings: false,
+  moveOverlay: false
 }
+let movementShortcutBindings: ReturnType<typeof overlayMovementAccelerators> = []
+const overlayMovementRepeater = new HeldOverlayMovementRepeater()
 
 function preloadPath(): string {
   return path.join(__dirname, '../preload/index.cjs')
@@ -338,6 +351,88 @@ function closeOverlay(id: string): void {
   if (activeOverlayId === id) activeOverlayId = null
 }
 
+function overlayForMovement(): OverlaySession | null {
+  const active = activeOverlayId ? overlays.get(activeOverlayId) : undefined
+  if (active && !active.window.isDestroyed()) return active
+  const available = [...overlays.values()].filter(
+    (overlay) => !overlay.window.isDestroyed()
+  )
+  return available.at(-1) ?? null
+}
+
+function moveOverlaySession(
+  overlay: OverlaySession,
+  direction: OverlayMoveDirection
+): void {
+  if (overlay.window.isDestroyed()) return
+  const current = overlay.window.getBounds()
+  const workArea = screen.getDisplayMatching(current).workArea
+  const next = moveOverlayBounds(current, workArea, direction)
+  if (!overlayBoundsChanged(current, next)) return
+  overlay.window.setBounds(next)
+  overlay.layout = {
+    ...overlay.layout,
+    workArea,
+    originX: next.x,
+    bounds: {
+      ...overlay.layout.bounds,
+      x: next.x,
+      y: next.y
+    }
+  }
+  activeOverlayId = overlay.id
+}
+
+function moveActiveOverlay(direction: OverlayMoveDirection): OverlaySession | null {
+  const overlay = overlayForMovement()
+  if (!overlay) return null
+  moveOverlaySession(overlay, direction)
+  return overlay
+}
+
+function stopOverlayMovementRepeat(): void {
+  overlayMovementRepeater.stop()
+}
+
+function beginOverlayMovement(
+  direction: OverlayMoveDirection,
+  shortcut: string
+): void {
+  stopOverlayMovementRepeat()
+  const overlay = moveActiveOverlay(direction)
+  if (!overlay) return
+  overlayMovementRepeater.start(shortcut, direction, () => {
+    if (overlay.window.isDestroyed()) {
+      stopOverlayMovementRepeat()
+      return
+    }
+    moveOverlaySession(overlay, direction)
+  })
+}
+
+function registerMovementShortcutBindings(shortcut: string): boolean {
+  const registered: string[] = []
+  try {
+    for (const [direction, accelerator] of movementShortcutBindings) {
+      if (
+        !globalShortcut.register(accelerator, () =>
+          beginOverlayMovement(direction, shortcut)
+        )
+      ) {
+        break
+      }
+      registered.push(accelerator)
+    }
+  } catch {
+    // Any partially registered movement shortcuts are removed below.
+  }
+  const complete = registered.length === movementShortcutBindings.length
+  if (!complete) {
+    for (const accelerator of registered) globalShortcut.unregister(accelerator)
+  }
+  return complete
+}
+
 async function createOverlay(input: {
   capture: CapturedDisplay
   region: CaptureRegion
@@ -387,6 +482,9 @@ async function createOverlay(input: {
   overlays.set(id, overlay)
   activeOverlayId = id
   window.setTitle('Haired Answer')
+  window.on('focus', () => {
+    activeOverlayId = id
+  })
   window.on('closed', () => {
     overlay.controller?.abort()
     overlays.delete(id)
@@ -507,20 +605,37 @@ async function completeSelection(raw: unknown): Promise<{ id: string }> {
   return { id: overlay.id }
 }
 
-function registerShortcuts(settings: AppSettings): typeof shortcutState {
+function registerShortcuts(settings: AppSettings): ShortcutState {
+  stopOverlayMovementRepeat()
+  movementShortcutBindings = []
   globalShortcut.unregisterAll()
-  const entries: Array<[keyof typeof shortcutState, string, () => void]> = [
+  const entries: Array<[Exclude<ShortcutId, 'moveOverlay'>, string, () => void]> = [
     ['instant', settings.shortcuts.instant, () => startCaptureFromShortcut('instant')],
     ['ask', settings.shortcuts.ask, () => startCaptureFromShortcut('ask')],
     ['settings', settings.shortcuts.settings, () => void showSettings()]
   ]
-  shortcutState = { instant: false, ask: false, settings: false }
+  shortcutState = {
+    instant: false,
+    ask: false,
+    settings: false,
+    moveOverlay: false
+  }
   for (const [name, accelerator, action] of entries) {
     try {
       shortcutState[name] = globalShortcut.register(accelerator, action)
     } catch {
       shortcutState[name] = false
     }
+  }
+  try {
+    movementShortcutBindings = overlayMovementAccelerators(
+      settings.shortcuts.moveOverlay
+    )
+    shortcutState.moveOverlay = registerMovementShortcutBindings(
+      settings.shortcuts.moveOverlay
+    )
+  } catch {
+    shortcutState.moveOverlay = false
   }
   return shortcutState
 }
@@ -836,6 +951,7 @@ app.whenReady().then(async () => {
 app.on('activate', () => void showSettings())
 app.on('will-quit', () => {
   quitting = true
+  stopOverlayMovementRepeat()
   globalShortcut.unregisterAll()
   for (const overlay of overlays.values()) overlay.controller?.abort()
   historyVault?.close()

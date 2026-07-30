@@ -14,7 +14,7 @@ export interface BootstrapData {
   appVersion: string
   platform: 'darwin' | 'win32'
   settings: AppSettings
-  shortcuts: Record<'instant' | 'ask' | 'settings', boolean>
+  shortcuts: Record<keyof AppSettings['shortcuts'], boolean>
   providers: ProviderStatus[]
   historyBytes: number
   privacy: {
@@ -32,7 +32,7 @@ export interface HairedApi {
   quit(): IpcResult<unknown>
   updateSettings(patch: Partial<AppSettings>): IpcResult<{
     settings: AppSettings
-    shortcuts: Record<'instant' | 'ask' | 'settings', boolean>
+    shortcuts: Record<keyof AppSettings['shortcuts'], boolean>
   }>
   startCapture(mode: 'instant' | 'ask'): IpcResult<unknown>
   completeSelection(input: {
