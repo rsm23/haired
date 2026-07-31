@@ -37,7 +37,7 @@ import './styles.css'
 
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'rahmani@seifelmoulouk.com'
 const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || 'https://github.com/rsm23/haired'
-const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.0'
+const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.1'
 const RELEASE_NUMBER = RELEASE_VERSION.replace(/^v/, '')
 const RELEASE_REPOSITORY_URL =
   import.meta.env.VITE_RELEASE_REPOSITORY_URL || 'https://github.com/rsm23/haired'

@@ -1,11 +1,12 @@
 {
   "name": "@haired/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Haired protected desktop screen assistant",
   "main": "./out/main/index.js",
   "scripts": {
+    "icons:generate": "node scripts/generate-icons.mjs",
     "postinstall": "electron-builder install-app-deps",
     "predev": "electron-vite build",
     "dev": "electron-vite dev",

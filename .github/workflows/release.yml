@@ -1,10 +1,18 @@
-name: Signed desktop release
+name: Branded unsigned desktop release
 
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: Existing version tag to publish
+        required: true
+        type: string
+      release_title:
+        description: Descriptive GitHub release title
+        required: true
+        type: string
+      release_notes_path:
+        description: Version-controlled Markdown release notes
         required: true
         type: string
 
@@ -22,34 +30,26 @@ jobs:
             os: macos-15
             target: --mac dmg zip --x64
             artifact: mac-x64
+            config: electron-builder.preview.yml
           - name: macOS Apple Silicon
             os: macos-15
             target: --mac dmg zip --arm64
             artifact: mac-arm64
+            config: electron-builder.preview.yml
           - name: Windows x64
             os: windows-2025
             target: --win nsis --x64
             artifact: windows-x64
+            config: electron-builder.preview.yml
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
       NODE_ENV: production
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
       VITE_RELEASE_OWNER: ${{ github.repository_owner }}
       VITE_RELEASE_REPO: haired
       VITE_PUBLIC_APP_URL: https://rsm23.github.io/haired/
       VITE_SUPPORT_EMAIL: rahmani@seifelmoulouk.com
-      CSC_LINK: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
-      CSC_KEY_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
-      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ vars.AZURE_TRUSTED_SIGNING_ENDPOINT }}
-      AZURE_TRUSTED_SIGNING_ACCOUNT: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT }}
-      AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE: ${{ vars.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
-      WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,24 +63,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      - name: Require Apple signing inputs
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          test -n "$CSC_LINK"
-          test -n "$CSC_KEY_PASSWORD"
-          test -n "$APPLE_API_KEY"
-          test -n "$APPLE_API_KEY_ID"
-          test -n "$APPLE_API_ISSUER"
-      - name: Require Azure Trusted Signing inputs
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          if (-not $env:AZURE_CLIENT_ID) { throw "AZURE_CLIENT_ID is required" }
-          if (-not $env:AZURE_TRUSTED_SIGNING_ENDPOINT) { throw "Azure Trusted Signing endpoint is required" }
-          if (-not $env:AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE) { throw "Azure certificate profile is required" }
-      - name: Build signed packages
-        run: pnpm --filter @haired/desktop exec electron-builder ${{ matrix.target }} --publish never
+      - name: Build release packages
+        run: >-
+          pnpm --filter @haired/desktop exec electron-builder
+          --config ${{ matrix.config }}
+          ${{ matrix.target }}
+          --publish never
       - name: Reject source maps and secret-like material
         shell: bash
         run: |
@@ -92,23 +80,34 @@ jobs:
             echo "Secret-like material found in release output"
             exit 1
           fi
-      - name: Verify Apple signatures and notarization
+      - name: Verify branded macOS package icon
         if: runner.os == 'macOS'
         shell: bash
         run: |
           APP_PATH="$(find apps/desktop/release -type d -name 'Haired.app' | head -1)"
           test -n "$APP_PATH"
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          spctl --assess --type execute --verbose=2 "$APP_PATH"
-          for dmg in apps/desktop/release/*.dmg; do xcrun stapler validate "$dmg"; done
-      - name: Verify Windows Authenticode signature
+          cmp apps/desktop/assets/icon.icns "$APP_PATH/Contents/Resources/icon.icns"
+          for dmg in apps/desktop/release/*.dmg; do
+            MOUNT_PATH="$RUNNER_TEMP/haired-dmg-$RANDOM"
+            mkdir -p "$MOUNT_PATH"
+            hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_PATH" "$dmg"
+            cmp apps/desktop/assets/icon.icns "$MOUNT_PATH/Haired.app/Contents/Resources/icon.icns"
+            hdiutil detach "$MOUNT_PATH"
+          done
+      - name: Verify branded Windows installer icon
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $installer = Get-ChildItem apps/desktop/release -Filter *.exe | Select-Object -First 1
           if (-not $installer) { throw "Installer missing" }
-          $signature = Get-AuthenticodeSignature $installer.FullName
-          if ($signature.Status -ne "Valid") { throw "Invalid signature: $($signature.Status)" }
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($installer.FullName)
+          if (-not $icon) { throw "Installer icon missing" }
+          $bitmap = $icon.ToBitmap()
+          $center = $bitmap.GetPixel([int]($bitmap.Width / 2), [int]($bitmap.Height / 2))
+          if ($center.R -lt 170 -or $center.G -gt 170 -or $center.B -gt 120) {
+            throw "Installer does not contain the orange Haired mark: $center"
+          }
       - uses: anchore/sbom-action@v0
         with:
           path: apps/desktop/release
@@ -139,16 +138,35 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
-      - name: Create draft, upload every platform, then promote
+      - name: Validate versioned release metadata
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
+        run: |
+          test "$RELEASE_TAG" = "v$(node -p "require('./apps/desktop/package.json').version")"
+          test -s "$RELEASE_NOTES_PATH"
+      - name: Generate aggregate release checksums
+        run: |
+          find release-assets -maxdepth 1 -type f ! -name 'SHA256SUMS*.txt' -print0 \
+            | sort -z \
+            | xargs -0 shasum -a 256 \
+            | sed 's#  release-assets/#  #' \
+            > release-assets/SHA256SUMS.txt
+      - name: Create detailed prerelease, upload every platform, then publish
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TITLE: ${{ inputs.release_title }}
+          RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
         run: |
-          gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --verify-tag=false --title "Haired $RELEASE_TAG" --generate-notes
+          gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --prerelease --verify-tag --title "$RELEASE_TITLE" --notes-file "$RELEASE_NOTES_PATH"
           gh release upload "$RELEASE_TAG" release-assets/* --repo "$RELEASE_REPO" --clobber
-          gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft=false --latest
+          gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft=false --prerelease

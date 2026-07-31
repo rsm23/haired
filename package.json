@@ -1,6 +1,6 @@
 {
   "name": "haired",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Secure cross-platform AI screen assistant",
   "packageManager": "pnpm@11.10.0",

@@ -289,7 +289,7 @@ This is a private pnpm TypeScript monorepo:
 
 ```text
 haired/
-├── .github/workflows/       CI, CodeQL, GitHub Pages, and signed releases
+├── .github/workflows/       CI, CodeQL, GitHub Pages, and desktop releases
 ├── apps/
 │   ├── desktop/             Electron main/preload, React UI, capture, providers,
 │   │                        encrypted history, overlays, shortcuts, and updater
@@ -459,7 +459,7 @@ The web app reads Vite variables at build/start time. For a temporary preview:
 
 ```sh
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com \
-VITE_RELEASE_VERSION=v0.1.0 \
+VITE_RELEASE_VERSION=v0.1.1 \
 VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired \
 pnpm dev:web
 ```
@@ -468,7 +468,7 @@ Alternatively, create an ignored `apps/web/.env.local` file:
 
 ```dotenv
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com
-VITE_RELEASE_VERSION=v0.1.0
+VITE_RELEASE_VERSION=v0.1.1
 VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired
 ```
 
@@ -512,8 +512,9 @@ never be used in the website build.
 These are public build-time values. Never add AI-provider keys, access tokens,
 signing certificates, or GitHub App private keys to Vite variables.
 
-Signing and publishing secrets are consumed only by the signed-release GitHub
-Actions workflow. See [Desktop releases and updates](#desktop-releases-and-updates).
+The v0.1.1 packages are unsigned previews. See
+[Desktop releases and updates](#desktop-releases-and-updates) for the resulting
+Gatekeeper and SmartScreen warnings.
 
 ## Testing and builds
 
@@ -562,6 +563,15 @@ pnpm --filter @haired/desktop dist
 Outputs are written under `apps/desktop/release/`. Local unsigned packages are
 for development only and are not equivalent to a signed production release.
 
+The desktop packages use the Haired star mark from `apps/desktop/assets/` for
+the macOS app/DMG and the Windows application, installer, and uninstaller. On
+macOS, regenerate the committed PNG, ICNS, and multi-resolution ICO files after
+editing the source SVG with:
+
+```sh
+pnpm --filter @haired/desktop icons:generate
+```
+
 The distributable preview configuration uses the package identifier
 `com.seifelmoulouk.hiarded` and can be built without signing credentials:
 
@@ -576,30 +586,31 @@ pnpm --filter @haired/desktop dist:preview
 ## Desktop releases and updates
 
 The manual **Build unsigned preview packages** workflow builds macOS Intel,
-macOS Apple Silicon, and Windows x64 packages on native GitHub runners. These
-artifacts are published as a GitHub prerelease and are explicitly labelled
-unsigned on the landing page because no Apple Developer ID or Azure Trusted
-Signing credentials are configured.
+macOS Apple Silicon, and Windows x64 packages on native GitHub runners for
+packaging QA. Preview artifacts are never presented as notarized releases.
 
-The separate **Signed desktop release** workflow accepts an existing version tag
-and builds:
+The separate **Branded unsigned desktop release** workflow accepts an existing
+version tag, a descriptive release title, and a version-controlled Markdown
+release-notes path. It builds:
 
 - macOS Intel DMG and ZIP.
 - macOS Apple Silicon DMG and ZIP.
 - Windows x64 NSIS installer.
 
-The workflow requires Apple Developer ID signing/notarization inputs and Azure
-Trusted Signing inputs. It runs `pnpm check`, rejects source maps and common
-secret patterns, verifies platform signatures, creates SPDX SBOMs and SHA-256
-checksums, and uploads all platforms to a draft release. Only after every build
-succeeds does it promote the release in the same public `haired` repository.
-The workflow uses the repository-scoped GitHub Actions token, so it does not
-need a cross-repository GitHub App credential.
+Both macOS and Windows v0.1.1 are unsigned. macOS Gatekeeper and Windows
+SmartScreen may therefore warn on first launch. The macOS jobs compare the
+packaged ICNS byte-for-byte with the committed Haired icon, while the Windows
+job extracts the installer icon and checks the orange Haired center mark. Every
+platform also runs `pnpm check`, rejects source maps and common secret patterns,
+and receives an SPDX SBOM and SHA-256 checksum manifest. The workflow publishes
+a prerelease only after every build succeeds, using the repository-scoped
+GitHub Actions token and the committed release notes instead of generic
+generated notes.
 
-Production desktop builds check for updates 15 seconds after launch and every
-six hours. A downloaded signed update can restart immediately or install when
-the app quits. Update installation is deferred while a capture, export, or
-other protected operation is busy.
+Release desktop builds check for updates 15 seconds after launch and every six
+hours. A downloaded update can restart immediately or install when the app
+quits. Update installation is deferred while a capture, export, or other
+protected operation is busy.
 
 ## Troubleshooting
 
@@ -655,7 +666,7 @@ website only.
 
 ## Project status and licensing
 
-The workspace version is `0.1.0` and should be treated as pre-release software
+The workspace version is `0.1.1` and should be treated as pre-release software
 until the platform verification matrix in `docs/release-gates.md` has passed for
 the intended release artifacts.
 

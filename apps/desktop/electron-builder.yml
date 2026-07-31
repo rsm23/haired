@@ -18,6 +18,7 @@ electronFuses:
   enableEmbeddedAsarIntegrityValidation: true
   onlyLoadAppFromAsar: true
 mac:
+  icon: assets/icon.icns
   target:
     - dmg
     - zip
@@ -28,6 +29,7 @@ mac:
   extendInfo:
     NSScreenCaptureUsageDescription: Haired captures only the screen region you explicitly select.
 win:
+  icon: assets/icon.ico
   target:
     - nsis
   azureSignOptions:
@@ -36,6 +38,9 @@ win:
     codeSigningAccountName: ${env.AZURE_TRUSTED_SIGNING_ACCOUNT}
     publisherName: ${env.WINDOWS_PUBLISHER_NAME}
 nsis:
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
   oneClick: false
   allowToChangeInstallationDirectory: false
   deleteAppDataOnUninstall: false
