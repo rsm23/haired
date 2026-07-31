@@ -459,8 +459,8 @@ The web app reads Vite variables at build/start time. For a temporary preview:
 
 ```sh
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com \
-VITE_DOWNLOAD_URL=https://example.com/download \
-VITE_GITHUB_URL=https://github.com/example/haired \
+VITE_RELEASE_VERSION=v0.1.0 \
+VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired-releases \
 pnpm dev:web
 ```
 
@@ -468,51 +468,35 @@ Alternatively, create an ignored `apps/web/.env.local` file:
 
 ```dotenv
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com
-VITE_DOWNLOAD_URL=https://example.com/download
-VITE_GITHUB_URL=https://github.com/example/haired
+VITE_RELEASE_VERSION=v0.1.0
+VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired-releases
 ```
 
 Provider API keys do not belong in this file.
 
 ## Publish the site with GitHub Pages
 
-The repository already contains
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml). It installs the
-workspace, builds `@haired/web`, uploads `apps/web/dist`, and deploys it with the
-official GitHub Pages actions whenever `main` is pushed. It can also be run
-manually with **workflow_dispatch**.
+The private source repository keeps the React/Vite implementation and builds a
+`github-pages-site` artifact through
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml). The public
+`rsm23/haired-releases` repository contains only the generated HTML/assets,
+release notes, checksums, and desktop packages. This keeps application source
+private while allowing the landing page and installers to be public.
 
-After the repository is on GitHub:
+To publish a generated site:
 
-1. Open **Repository Settings → Pages**.
-2. Under **Build and deployment**, choose **GitHub Actions** as the source.
-3. Ensure Actions are enabled for the repository.
-4. Configure the public site values used by the Pages build. The current
-   workflow uses the app's safe fallbacks unless `VITE_SUPPORT_EMAIL`,
-   `VITE_DOWNLOAD_URL`, and `VITE_GITHUB_URL` are supplied to its build step.
-5. Push to `main`, or open **Actions → Deploy landing page to GitHub Pages → Run
-   workflow**.
-6. Wait for the `build` and `deploy` jobs to pass, then open the deployment URL
-   shown in the workflow or the Pages settings screen.
+1. Run `pnpm --filter @haired/web build` in the private source checkout.
+2. Copy the contents of `apps/web/dist/` to the root of the public
+   `haired-releases` repository without copying source files or `.env` files.
+3. In **haired-releases → Settings → Pages**, choose **Deploy from a branch**,
+   select `main` and `/ (root)`, then save.
+4. Open `https://rsm23.github.io/haired-releases/` and verify the download
+   section, legal/help hash routes, and release links.
 
 The Vite config uses `base: './'`, and the site uses hash-based legal/help
-routes. No custom 404 rewrite is required for repository Pages URLs.
-
-For example, create `SUPPORT_EMAIL`, `DOWNLOAD_URL`, and `GITHUB_URL` under
-**Settings → Secrets and variables → Actions → Variables**, then map them on the
-existing web build step in `.github/workflows/pages.yml`:
-
-```yaml
-- run: pnpm --filter @haired/web build
-  env:
-    VITE_SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL }}
-    VITE_DOWNLOAD_URL: ${{ vars.DOWNLOAD_URL }}
-    VITE_GITHUB_URL: ${{ vars.GITHUB_URL }}
-```
-
-These values are public because Vite embeds them in the browser bundle. Do not
-use GitHub secrets for AI-provider keys here; provider keys belong only in the
-desktop app's encrypted provider settings.
+routes. No custom 404 rewrite is required for repository Pages URLs. Release
+version and repository values are public build-time inputs; provider keys must
+never be used in the website build.
 
 ## Configuration
 
@@ -523,8 +507,9 @@ desktop app's encrypted provider settings.
 | `HAIRED_APP_ID` | Electron Builder | Reverse-DNS application identifier used for packaged releases |
 | `VITE_PUBLIC_APP_URL` | Desktop | Allowed HTTPS public-app host for external navigation |
 | `VITE_SUPPORT_EMAIL` | Web | Support address shown on the help page |
-| `VITE_DOWNLOAD_URL` | Web | Download-button destination; defaults to `#/help` |
 | `VITE_GITHUB_URL` | Web | Optional source-link destination; hidden when empty |
+| `VITE_RELEASE_VERSION` | Web | Published preview tag used to construct direct installer URLs |
+| `VITE_RELEASE_REPOSITORY_URL` | Web | Public repository that hosts Pages, releases, checksums, and installers |
 | `VITE_RELEASE_OWNER` | Desktop release | Owner of the public updater/release repository |
 | `VITE_RELEASE_REPO` | Desktop release | Updater/release repository, normally `haired-releases` |
 
@@ -582,9 +567,27 @@ pnpm --filter @haired/desktop dist
 Outputs are written under `apps/desktop/release/`. Local unsigned packages are
 for development only and are not equivalent to a signed production release.
 
+The distributable preview configuration uses the package identifier
+`com.seifelmoulouk.hiarded` and can be built without signing credentials:
+
+```sh
+HAIRED_APP_ID=com.seifelmoulouk.hiarded \
+VITE_PUBLIC_APP_URL=https://rsm23.github.io/haired-releases/ \
+VITE_RELEASE_OWNER=rsm23 \
+VITE_RELEASE_REPO=haired-releases \
+CSC_IDENTITY_AUTO_DISCOVERY=false \
+pnpm --filter @haired/desktop dist:preview
+```
+
 ## Desktop releases and updates
 
-The manual **Signed desktop release** workflow accepts an existing version tag
+The manual **Build unsigned preview packages** workflow builds macOS Intel,
+macOS Apple Silicon, and Windows x64 packages on native GitHub runners. These
+artifacts are published as a GitHub prerelease and are explicitly labelled
+unsigned on the landing page because no Apple Developer ID or Azure Trusted
+Signing credentials are configured.
+
+The separate **Signed desktop release** workflow accepts an existing version tag
 and builds:
 
 - macOS Intel DMG and ZIP.

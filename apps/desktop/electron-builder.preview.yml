@@ -9,7 +9,7 @@ directories:
 files:
   - out/**/*
   - package.json
-forceCodeSigning: true
+forceCodeSigning: false
 electronFuses:
   runAsNode: false
   enableCookieEncryption: true
@@ -24,17 +24,12 @@ mac:
   category: public.app-category.productivity
   hardenedRuntime: true
   gatekeeperAssess: false
-  notarize: true
+  notarize: false
   extendInfo:
     NSScreenCaptureUsageDescription: Haired captures only the screen region you explicitly select.
 win:
   target:
     - nsis
-  azureSignOptions:
-    endpoint: ${env.AZURE_TRUSTED_SIGNING_ENDPOINT}
-    certificateProfileName: ${env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE}
-    codeSigningAccountName: ${env.AZURE_TRUSTED_SIGNING_ACCOUNT}
-    publisherName: ${env.WINDOWS_PUBLISHER_NAME}
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: false
@@ -43,4 +38,4 @@ publish:
   provider: github
   owner: ${env.VITE_RELEASE_OWNER}
   repo: ${env.VITE_RELEASE_REPO}
-  releaseType: draft
+  releaseType: prerelease

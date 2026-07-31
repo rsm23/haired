@@ -12,6 +12,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "dist": "pnpm build && electron-builder --publish never",
+    "dist:preview": "pnpm build && electron-builder --config electron-builder.preview.yml --publish never",
     "dist:publish": "pnpm build && electron-builder --publish always",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src electron.vite.config.ts --max-warnings=0",

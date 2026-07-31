@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
+  Apple,
   ArrowRight,
   Braces,
+  CircleAlert,
   Download,
   Eye,
+  ExternalLink,
   History,
   Laptop,
   LockKeyhole,
+  MonitorDown,
   MonitorOff,
   MousePointer2,
   ScanSearch,
@@ -32,9 +36,43 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import './styles.css'
 
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'rahmani@seifelmoulouk.com'
-const DOWNLOAD_URL = import.meta.env.VITE_DOWNLOAD_URL || '#/help'
 const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || ''
+const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.0'
+const RELEASE_NUMBER = RELEASE_VERSION.replace(/^v/, '')
+const RELEASE_REPOSITORY_URL =
+  import.meta.env.VITE_RELEASE_REPOSITORY_URL || 'https://github.com/rsm23/haired-releases'
+const RELEASE_DOWNLOAD_BASE_URL = `${RELEASE_REPOSITORY_URL}/releases/download/${RELEASE_VERSION}`
+const RELEASE_PAGE_URL = `${RELEASE_REPOSITORY_URL}/releases/tag/${RELEASE_VERSION}`
+const CHECKSUM_URL = `${RELEASE_DOWNLOAD_BASE_URL}/SHA256SUMS.txt`
+const DOWNLOAD_URL = '#downloads'
 const WORKSPACE_IMAGE_URL = `${import.meta.env.BASE_URL}assets/haired-workspace.jpg`
+
+const downloadPackages = [
+  {
+    platform: 'Windows 10 / 11',
+    architecture: '64-bit Intel or AMD',
+    format: 'NSIS installer · .exe',
+    fileName: `Haired-${RELEASE_NUMBER}-win-x64.exe`,
+    url: `${RELEASE_DOWNLOAD_BASE_URL}/Haired-${RELEASE_NUMBER}-win-x64.exe`,
+    icon: MonitorDown
+  },
+  {
+    platform: 'macOS',
+    architecture: 'Apple silicon',
+    format: 'Disk image · .dmg',
+    fileName: `Haired-${RELEASE_NUMBER}-mac-arm64.dmg`,
+    url: `${RELEASE_DOWNLOAD_BASE_URL}/Haired-${RELEASE_NUMBER}-mac-arm64.dmg`,
+    icon: Apple
+  },
+  {
+    platform: 'macOS',
+    architecture: 'Intel',
+    format: 'Disk image · .dmg',
+    fileName: `Haired-${RELEASE_NUMBER}-mac-x64.dmg`,
+    url: `${RELEASE_DOWNLOAD_BASE_URL}/Haired-${RELEASE_NUMBER}-mac-x64.dmg`,
+    icon: Apple
+  }
+]
 
 declare global {
   interface Window {
@@ -177,6 +215,7 @@ function Shell({ children, route }: { children: React.ReactNode; route: Route })
         <nav aria-label="Main navigation">
           <a href="#product">Product</a>
           <a href="#providers">Providers</a>
+          <a href="#downloads">Downloads</a>
           <a href="#/privacy" aria-current={route === 'privacy' ? 'page' : undefined}>
             Privacy
           </a>
@@ -203,6 +242,7 @@ function Shell({ children, route }: { children: React.ReactNode; route: Route })
         <Logo />
         <p>Free, keyboard-first screen intelligence.</p>
         <div>
+          <a href={RELEASE_REPOSITORY_URL} target="_blank" rel="noreferrer">Releases</a>
           <a href="#/privacy">Privacy</a>
           <a href="#/terms">Terms</a>
           <a href="#/help">Help</a>
@@ -580,6 +620,66 @@ function Home() {
               <strong>Requests go directly</strong>
               to the selected provider
             </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="downloads-section section-grid" id="downloads" aria-labelledby="downloads-title">
+        <div className="downloads-heading">
+          <div>
+            <span className="page-label">Desktop preview · {RELEASE_VERSION}</span>
+            <h2 id="downloads-title">
+              Download Haired.
+              <br />
+              <em>Choose your computer.</em>
+            </h2>
+          </div>
+          <p>
+            Native packages for Windows and both current Mac architectures. Every button points
+            directly to the matching GitHub-hosted release asset.
+          </p>
+        </div>
+
+        <div className="download-grid">
+          {downloadPackages.map((downloadPackage) => {
+            const Icon = downloadPackage.icon
+            return (
+              <a
+                className="download-card"
+                href={downloadPackage.url}
+                key={downloadPackage.fileName}
+                aria-label={`Download ${downloadPackage.platform} for ${downloadPackage.architecture}`}
+              >
+                <span className="download-card-icon" aria-hidden="true">
+                  <Icon />
+                </span>
+                <span className="download-card-copy">
+                  <strong>{downloadPackage.platform}</strong>
+                  <span>{downloadPackage.architecture}</span>
+                  <small>{downloadPackage.format}</small>
+                  <code>{downloadPackage.fileName}</code>
+                </span>
+                <Download className="download-card-arrow" aria-hidden="true" />
+              </a>
+            )
+          })}
+        </div>
+
+        <div className="download-release-meta">
+          <div className="preview-notice">
+            <CircleAlert aria-hidden="true" />
+            <p>
+              <strong>Unsigned preview build.</strong> Windows SmartScreen or macOS Gatekeeper may
+              show a warning. Verify the SHA-256 checksum before opening the installer.
+            </p>
+          </div>
+          <div className="release-links">
+            <a href={RELEASE_PAGE_URL} target="_blank" rel="noreferrer">
+              Release notes <ExternalLink />
+            </a>
+            <a href={CHECKSUM_URL} target="_blank" rel="noreferrer">
+              SHA-256 checksums <ExternalLink />
+            </a>
           </div>
         </div>
       </section>
