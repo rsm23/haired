@@ -463,7 +463,7 @@ The web app reads Vite variables at build/start time. For a temporary preview:
 
 ```sh
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com \
-VITE_RELEASE_VERSION=v0.1.1 \
+VITE_RELEASE_VERSION=v0.1.2 \
 VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired \
 pnpm dev:web
 ```
@@ -472,7 +472,7 @@ Alternatively, create an ignored `apps/web/.env.local` file:
 
 ```dotenv
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com
-VITE_RELEASE_VERSION=v0.1.1
+VITE_RELEASE_VERSION=v0.1.2
 VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired
 ```
 
@@ -516,7 +516,7 @@ never be used in the website build.
 These are public build-time values. Never add AI-provider keys, access tokens,
 signing certificates, or GitHub App private keys to Vite variables.
 
-The v0.1.1 packages are unsigned previews. See
+The v0.1.2 packages are unsigned previews. See
 [Desktop releases and updates](#desktop-releases-and-updates) for the resulting
 Gatekeeper and SmartScreen warnings.
 
@@ -601,7 +601,7 @@ release-notes path. It builds:
 - macOS Apple Silicon DMG and ZIP.
 - Windows x64 NSIS installer.
 
-Both macOS and Windows v0.1.1 are unsigned. macOS Gatekeeper and Windows
+Both macOS and Windows v0.1.2 are unsigned. macOS Gatekeeper and Windows
 SmartScreen may therefore warn on first launch. The macOS jobs compare the
 packaged ICNS byte-for-byte with the committed Haired icon, while the Windows
 job extracts the installer icon and checks the orange Haired center mark. Every
