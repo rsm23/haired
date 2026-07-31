@@ -368,6 +368,26 @@ describe('provider manager', () => {
     ).not.toContain('return only complete fenced Markdown code blocks')
   })
 
+  it('alternates detailed reasoning and code when interview mode is enabled', () => {
+    const prompt = providerInternals.buildPrompt({
+      requestId: crypto.randomUUID(),
+      mode: 'fast',
+      codeResponseStyle: 'code-only',
+      interviewMode: true,
+      prompt: 'Implement the visible TypeScript task',
+      conversation: []
+    })
+
+    expect(prompt).toContain(
+      'detailed interpretation of the problem, the relevant constraints, and the implementation plan'
+    )
+    expect(prompt).toContain('Before every code block, provide a substantive reasoning section')
+    expect(prompt).toContain('alternatives and tradeoffs, complexity, edge cases')
+    expect(prompt).toContain('reviews correctness, complexity, important edge cases')
+    expect(prompt).toContain('do not claim to reveal private hidden chain-of-thought')
+    expect(prompt).not.toContain('return only complete fenced Markdown code blocks')
+  })
+
   it('treats a one-click programming exercise as a task to solve', () => {
     const prompt = providerInternals.buildPrompt({
       requestId: crypto.randomUUID(),

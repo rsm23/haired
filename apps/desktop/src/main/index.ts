@@ -79,6 +79,7 @@ interface OverlaySession {
   image: Buffer
   mode: AnalysisMode
   codeResponseStyle: CodeResponseStyle
+  interviewMode: boolean
   question: string
   answer: string
   pinned: boolean
@@ -440,9 +441,13 @@ async function createOverlay(input: {
   question: string
   mode: AnalysisMode
   codeResponseStyle: CodeResponseStyle
+  interviewMode?: boolean
   interaction?: CaptureMode
   conversation?: OverlaySession['conversation']
 }): Promise<OverlaySession> {
+  const settings = await settingsStore.load()
+  const interviewMode = input.interviewMode ?? settings.interviewMode
+  const codeResponseStyle = interviewMode ? 'full-reply' : input.codeResponseStyle
   closeUnpinnedOverlays()
   if (activeOverlayId) {
     const active = overlays.get(activeOverlayId)
@@ -469,7 +474,8 @@ async function createOverlay(input: {
     window,
     image: input.image,
     mode: input.mode,
-    codeResponseStyle: input.codeResponseStyle,
+    codeResponseStyle,
+    interviewMode,
     question: input.question,
     answer: '',
     pinned: false,
@@ -490,14 +496,14 @@ async function createOverlay(input: {
     overlays.delete(id)
     if (activeOverlayId === id) activeOverlayId = null
   })
-  const settings = await settingsStore.load()
   window.once('ready-to-show', () => {
     window.showInactive()
     sendToRenderer(window, 'overlay:init', {
       id,
       question: input.question,
+      interaction: overlay.interaction,
       mode: input.mode,
-      codeResponseStyle: input.codeResponseStyle,
+      codeResponseStyle,
       columnWidth: layout.columnWidth,
       magnifyingGlassCursor: settings.magnifyingGlassCursor
     })
@@ -522,6 +528,7 @@ async function streamOverlay(overlay: OverlaySession): Promise<void> {
     requestId: randomUUID(),
     mode: overlay.mode,
     codeResponseStyle: overlay.codeResponseStyle,
+    interviewMode: overlay.interviewMode,
     interaction: overlay.interaction,
     prompt: overlay.question,
     conversation: overlay.conversation
@@ -598,7 +605,8 @@ async function completeSelection(raw: unknown): Promise<{ id: string }> {
     image,
     question,
     mode: settings.defaultMode,
-    codeResponseStyle: settings.codeResponseStyle,
+    codeResponseStyle: settings.interviewMode ? 'full-reply' : settings.codeResponseStyle,
+    interviewMode: settings.interviewMode,
     interaction: mode
   })
   void streamOverlay(overlay)
@@ -903,6 +911,7 @@ function registerIpc(): void {
     overlay.historyId = null
     if (!sendToRenderer(overlay.window, 'overlay:reset', {
       question: prompt,
+      interaction: overlay.interaction,
       codeResponseStyle: overlay.codeResponseStyle
     })) {
       throw new Error('Answer is no longer available')

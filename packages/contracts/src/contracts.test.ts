@@ -6,6 +6,7 @@ import {
   CODE_ANSWER_INSTRUCTION,
   CODE_ONLY_ANSWER_INSTRUCTION,
   DEFAULT_INSTRUCTION,
+  INTERVIEW_MODE_INSTRUCTION,
   SCREEN_TASK_INSTRUCTION,
   streamEventSchema
 } from './index'
@@ -15,6 +16,7 @@ describe('shared contracts', () => {
     const settings = appSettingsSchema.parse({})
     expect(settings.defaultMode).toBe('fast')
     expect(settings.codeResponseStyle).toBe('full-reply')
+    expect(settings.interviewMode).toBe(false)
     expect(settings.themeColor).toBe('black')
     expect(settings.launchAtLogin).toBe(false)
     expect(settings.magnifyingGlassCursor).toBe(false)
@@ -29,6 +31,12 @@ describe('shared contracts', () => {
     expect(settings.defaultInstruction).toContain('complete, directly usable code')
     expect(settings.defaultInstruction).toContain('fenced Markdown code block')
     expect(CODE_ONLY_ANSWER_INSTRUCTION).toContain('only complete fenced Markdown code blocks')
+    expect(INTERVIEW_MODE_INSTRUCTION).toContain(
+      'detailed interpretation of the problem, the relevant constraints, and the implementation plan'
+    )
+    expect(INTERVIEW_MODE_INSTRUCTION).toContain(
+      'Never place two code blocks back to back without reasoning between them'
+    )
     expect(settings.providers.selected).toBe('codex')
     expect(settings.providers.codex).toMatchObject({
       enabled: true,
@@ -95,14 +103,15 @@ describe('shared contracts', () => {
   })
 
   it('defaults old analysis metadata to full replies', () => {
-    expect(
-      analysisMetadataSchema.parse({
-        requestId: crypto.randomUUID(),
-        mode: 'fast',
-        prompt: 'Solve this',
-        conversation: []
-      }).codeResponseStyle
-    ).toBe('full-reply')
+    const metadata = analysisMetadataSchema.parse({
+      requestId: crypto.randomUUID(),
+      mode: 'fast',
+      prompt: 'Solve this',
+      conversation: []
+    })
+
+    expect(metadata.codeResponseStyle).toBe('full-reply')
+    expect(metadata.interviewMode).toBe(false)
   })
 
   it('validates every streaming event shape', () => {

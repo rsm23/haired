@@ -71,6 +71,18 @@ export const CODE_ONLY_ANSWER_INSTRUCTION = [
   'When the request is not about code, answer normally.'
 ].join('\n')
 
+export const INTERVIEW_MODE_INSTRUCTION = [
+  'When the request or selected screen concerns code, answer in interview mode.',
+  '- Start with a detailed interpretation of the problem, the relevant constraints, and the implementation plan before showing any code.',
+  '- Alternate throughout the answer using repeated `Reasoning` and `Code` sections. Before every code block, provide a substantive reasoning section explaining what the next code section will do, why that approach was chosen, and how it connects to the previous and following sections. Never place two code blocks back to back without reasoning between them.',
+  '- Give enough explanation that the user could confidently narrate the solution in a technical interview. When relevant, discuss data structures, control flow, API or framework choices, alternatives and tradeoffs, complexity, edge cases, error handling, and testing or validation. Use focused paragraphs rather than a single short sentence.',
+  '- Describe the useful rationale and decision summary; do not claim to reveal private hidden chain-of-thought or internal token-by-token reasoning.',
+  '- Put every code section in a fenced Markdown code block with an accurate language tag.',
+  '- Across all code sections, provide the complete, directly usable solution. Never replace required code with ellipses, placeholder comments, or an explanation alone.',
+  '- After the final code section, add a final `Reasoning` section that reviews correctness, complexity, important edge cases, and how to validate the finished solution.',
+  'When the request is not about code, answer normally.'
+].join('\n')
+
 export const DEFAULT_INSTRUCTION = [
   'Analyze the selected screen region, infer the user’s likely intent, and complete the task shown.',
   'Resolve straightforward ambiguity from the screen when possible, and state any important assumption.',
@@ -205,13 +217,18 @@ export const analysisMetadataSchema = z.object({
   requestId: z.string().uuid(),
   mode: analysisModeSchema,
   codeResponseStyle: codeResponseStyleSchema.default('full-reply'),
+  interviewMode: z.boolean().default(false),
   interaction: z.enum(['instant', 'ask']).optional(),
   prompt: z.string().min(1).max(4_000),
   conversation: z.array(conversationTurnSchema).max(20).default([])
 })
 type ParsedAnalysisMetadata = z.infer<typeof analysisMetadataSchema>
-export type AnalysisMetadata = Omit<ParsedAnalysisMetadata, 'codeResponseStyle'> & {
+export type AnalysisMetadata = Omit<
+  ParsedAnalysisMetadata,
+  'codeResponseStyle' | 'interviewMode'
+> & {
   codeResponseStyle?: CodeResponseStyle
+  interviewMode?: boolean
 }
 
 export const streamEventSchema = z.discriminatedUnion('type', [
@@ -251,6 +268,7 @@ export type StreamEvent = z.infer<typeof streamEventSchema>
 export const appSettingsSchema = z.object({
   defaultMode: analysisModeSchema.default('fast'),
   codeResponseStyle: codeResponseStyleSchema.default('full-reply'),
+  interviewMode: z.boolean().default(false),
   themeColor: themeColorSchema.default('black'),
   defaultInstruction: z
     .string()

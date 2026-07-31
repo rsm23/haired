@@ -59,6 +59,8 @@ of Haired.
 - Streams Markdown answers, including syntax-highlighted fenced code blocks.
 - Solves visible programming tasks instead of merely summarizing them.
 - Offers **Fast** and **Deep** reasoning modes.
+- Offers an opt-in **Interview Mode** that alternates detailed technical reasoning with the
+  corresponding complete code sections.
 - Can display only complete code blocks or the provider's full reply.
 - Supports follow-up questions using the current answer as conversation context.
 - Lets you copy, export, pin, close, and move answer windows.
@@ -200,6 +202,8 @@ The desktop settings UI contains five sections:
   gray, black, and purple. Black is the fresh-install default.
 - Fast or Deep default analysis.
 - Code only or Full reply default for programming answers.
+- Interview Mode for a structured problem interpretation, implementation plan, reasoning/code
+  walkthrough, trade-offs, edge cases, complexity, and validation notes.
 - Overlay opacity from 62% to 98% (88% by default).
 - Optional 176 px, 1.85× magnifying-glass cursor over answer content.
 - Optional launch at login.

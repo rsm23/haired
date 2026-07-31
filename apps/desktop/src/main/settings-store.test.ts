@@ -44,6 +44,20 @@ describe('settings migration', () => {
     }
   })
 
+  it('persists interview mode across store instances', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'haired-interview-'))
+    const settingsPath = path.join(directory, 'settings.json')
+    try {
+      const first = new SettingsStore(settingsPath)
+      await first.update({ interviewMode: true, codeResponseStyle: 'full-reply' })
+
+      const relaunched = new SettingsStore(settingsPath)
+      expect((await relaunched.load()).interviewMode).toBe(true)
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   it('persists the selected color theme across store instances', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'haired-theme-'))
     const settingsPath = path.join(directory, 'settings.json')

@@ -83,6 +83,7 @@ export interface HairedApi {
   onOverlayInit(listener: (payload: {
     id: string
     question: string
+    interaction: 'instant' | 'ask'
     mode: AnalysisMode
     codeResponseStyle: CodeResponseStyle
     columnWidth: number
@@ -91,6 +92,7 @@ export interface HairedApi {
   onOverlayEvent(listener: (payload: StreamEvent) => void): Unsubscribe
   onOverlayReset(listener: (payload: {
     question: string
+    interaction: 'instant' | 'ask'
     codeResponseStyle: CodeResponseStyle
   }) => void): Unsubscribe
   onMagnifyingGlassCursorChanged(listener: (enabled: boolean) => void): Unsubscribe

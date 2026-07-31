@@ -1752,6 +1752,10 @@
   backdrop-filter: blur(20px) saturate(125%);
 }
 
+.answer-overlay-without-question {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
 .overlay-head {
   display: grid;
   height: 50px;

@@ -1477,7 +1477,9 @@ function AppearancePage({
               <div>
                 <FieldTitle id="code-response-style-label">Code answers</FieldTitle>
                 <FieldDescription>
-                  Show every complete code block alone, or keep the provider’s full reply.
+                  {settings.interviewMode
+                    ? 'Full reply is active so interview reasoning stays visible.'
+                    : 'Show every complete code block alone, or keep the provider’s full reply.'}
                 </FieldDescription>
               </div>
               <ToggleGroup
@@ -1485,6 +1487,7 @@ function AppearancePage({
                 variant="outline"
                 size="lg"
                 value={settings.codeResponseStyle}
+                disabled={settings.interviewMode}
                 onValueChange={(value) => {
                   if (value === 'code-only' || value === 'full-reply') {
                     void update({ codeResponseStyle: value }, 'Code answer style saved.')
@@ -1495,6 +1498,29 @@ function AppearancePage({
                 <ToggleGroupItem value="code-only">Code only</ToggleGroupItem>
                 <ToggleGroupItem value="full-reply">Full reply</ToggleGroupItem>
               </ToggleGroup>
+            </Field>
+            <Separator />
+            <Field orientation="horizontal">
+              <div>
+                <FieldTitle id="interview-mode-label">Interview mode</FieldTitle>
+                <FieldDescription>
+                  Alternate detailed technical reasoning with the corresponding parts of the
+                  code.
+                </FieldDescription>
+              </div>
+              <Switch
+                checked={settings.interviewMode}
+                aria-labelledby="interview-mode-label"
+                onCheckedChange={(checked) =>
+                  void update(
+                    {
+                      interviewMode: checked,
+                      ...(checked ? { codeResponseStyle: 'full-reply' as const } : {})
+                    },
+                    checked ? 'Interview mode enabled.' : 'Interview mode disabled.'
+                  )
+                }
+              />
             </Field>
             <Separator />
             <Field orientation="horizontal">
@@ -1561,8 +1587,8 @@ function AppearancePage({
         <CardHeader>
           <CardTitle>Default instruction</CardTitle>
           <CardDescription>
-            Used by Select & answer. Ask mode uses your question with the same code and Markdown
-            response rules.
+            Used by Select & answer. Ask mode uses your question with the same code, Markdown,
+            and Interview Mode response rules.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1579,6 +1605,12 @@ function AppearancePage({
               <FieldDescription>
                 {instruction.length.toLocaleString()} / 4,000 characters
               </FieldDescription>
+              {settings.interviewMode && (
+                <FieldDescription>
+                  Interview Mode adds the alternating reasoning-and-code format when this
+                  instruction is sent; your custom text is not overwritten.
+                </FieldDescription>
+              )}
             </Field>
           </FieldGroup>
         </CardContent>
@@ -2234,6 +2266,7 @@ function AnswerOverlay({ id }: { id: string }) {
     params.get('magnifyingGlassCursor') === 'true'
   )
   const [question, setQuestion] = useState('Preparing your question…')
+  const [interaction, setInteraction] = useState<'instant' | 'ask' | null>(null)
   const [mode, setMode] = useState<AnalysisMode>('fast')
   const [codeResponseStyle, setCodeResponseStyle] =
     useState<CodeResponseStyle>('full-reply')
@@ -2277,6 +2310,7 @@ function AnswerOverlay({ id }: { id: string }) {
   useEffect(() => {
     const removeInit = api.onOverlayInit((payload) => {
       setQuestion(payload.question)
+      setInteraction(payload.interaction)
       setMode(payload.mode)
       setCodeResponseStyle(payload.codeResponseStyle)
       setColumnWidth(payload.columnWidth)
@@ -2311,6 +2345,7 @@ function AnswerOverlay({ id }: { id: string }) {
     })
     const removeReset = api.onOverlayReset((payload) => {
       setQuestion(payload.question)
+      setInteraction(payload.interaction)
       setCodeResponseStyle(payload.codeResponseStyle)
       setAnswer('')
       setStatus('thinking')
@@ -2652,7 +2687,10 @@ function AnswerOverlay({ id }: { id: string }) {
 
   return (
     <main
-      className="answer-overlay dark"
+      className={cn(
+        'answer-overlay dark',
+        interaction !== 'ask' && 'answer-overlay-without-question'
+      )}
       style={
         {
           '--overlay-opacity': Math.min(0.98, Math.max(0.62, opacity))
@@ -2722,10 +2760,12 @@ function AnswerOverlay({ id }: { id: string }) {
           </Button>
         </div>
       </header>
-      <section className="overlay-question">
-        <span>QUESTION</span>
-        <p>{question}</p>
-      </section>
+      {interaction === 'ask' && (
+        <section className="overlay-question">
+          <span>QUESTION</span>
+          <p>{question}</p>
+        </section>
+      )}
       <div className="overlay-answer-stage">
         <div
           className={cn(

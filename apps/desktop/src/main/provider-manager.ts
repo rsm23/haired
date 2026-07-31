@@ -13,6 +13,7 @@ import type {
 import {
   CODE_ONLY_ANSWER_INSTRUCTION,
   CODE_ANSWER_INSTRUCTION,
+  INTERVIEW_MODE_INSTRUCTION,
   providerIdSchema,
   reasoningEffortSchema,
   SCREEN_TASK_INSTRUCTION
@@ -110,7 +111,10 @@ function buildPrompt(metadata: AnalysisMetadata): string {
   const responseRequirements = [
     metadata.prompt.includes(SCREEN_TASK_INSTRUCTION) ? '' : SCREEN_TASK_INSTRUCTION,
     metadata.prompt.includes(CODE_ANSWER_INSTRUCTION) ? '' : CODE_ANSWER_INSTRUCTION,
-    metadata.codeResponseStyle === 'code-only' ? CODE_ONLY_ANSWER_INSTRUCTION : ''
+    metadata.interviewMode ? INTERVIEW_MODE_INSTRUCTION : '',
+    metadata.codeResponseStyle === 'code-only' && !metadata.interviewMode
+      ? CODE_ONLY_ANSWER_INSTRUCTION
+      : ''
   ]
     .filter(Boolean)
     .join('\n\n')
