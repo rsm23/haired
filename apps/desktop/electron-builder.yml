@@ -1,4 +1,4 @@
-appId: ${env.HAIRED_APP_ID}
+appId: com.seifelmoulouk.hiarded
 productName: Haired
 artifactName: Haired-${version}-${os}-${arch}.${ext}
 asar: true

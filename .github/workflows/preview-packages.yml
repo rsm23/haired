@@ -30,7 +30,6 @@ jobs:
     env:
       NODE_ENV: production
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      HAIRED_APP_ID: com.seifelmoulouk.hiarded
       VITE_PUBLIC_APP_URL: https://rsm23.github.io/haired-releases/
       VITE_RELEASE_OWNER: rsm23
       VITE_RELEASE_REPO: haired-releases

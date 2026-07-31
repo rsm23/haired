@@ -504,7 +504,6 @@ never be used in the website build.
 
 | Variable | Used by | Purpose |
 |---|---|---|
-| `HAIRED_APP_ID` | Electron Builder | Reverse-DNS application identifier used for packaged releases |
 | `VITE_PUBLIC_APP_URL` | Desktop | Allowed HTTPS public-app host for external navigation |
 | `VITE_SUPPORT_EMAIL` | Web | Support address shown on the help page |
 | `VITE_GITHUB_URL` | Web | Optional source-link destination; hidden when empty |
@@ -552,9 +551,10 @@ Credential-backed Codex tests are opt-in:
 HAIRED_LIVE_CODEX=1 pnpm --filter @haired/desktop test
 ```
 
-CI runs `pnpm check` on pushes to `main` and pull requests. Pull requests also
-receive a dependency review that fails on high-severity findings. CodeQL scans
-JavaScript/TypeScript on pushes, pull requests, and a weekly schedule.
+CI runs `pnpm check` on pushes to `main` and pull requests. Dependency review
+and CodeQL run when GitHub exposes those services for the repository; they are
+skipped for the private source repository unless GitHub Advanced Security is
+enabled.
 
 ### Local desktop package
 
@@ -571,7 +571,6 @@ The distributable preview configuration uses the package identifier
 `com.seifelmoulouk.hiarded` and can be built without signing credentials:
 
 ```sh
-HAIRED_APP_ID=com.seifelmoulouk.hiarded \
 VITE_PUBLIC_APP_URL=https://rsm23.github.io/haired-releases/ \
 VITE_RELEASE_OWNER=rsm23 \
 VITE_RELEASE_REPO=haired-releases \

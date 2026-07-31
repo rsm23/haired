@@ -38,7 +38,6 @@ jobs:
       VITE_RELEASE_REPO: haired-releases
       VITE_PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL }}
       VITE_SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL }}
-      HAIRED_APP_ID: ${{ vars.HAIRED_APP_ID }}
       CSC_LINK: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
       CSC_KEY_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
