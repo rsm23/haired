@@ -460,7 +460,7 @@ The web app reads Vite variables at build/start time. For a temporary preview:
 ```sh
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com \
 VITE_RELEASE_VERSION=v0.1.0 \
-VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired-releases \
+VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired \
 pnpm dev:web
 ```
 
@@ -469,29 +469,26 @@ Alternatively, create an ignored `apps/web/.env.local` file:
 ```dotenv
 VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com
 VITE_RELEASE_VERSION=v0.1.0
-VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired-releases
+VITE_RELEASE_REPOSITORY_URL=https://github.com/rsm23/haired
 ```
 
 Provider API keys do not belong in this file.
 
 ## Publish the site with GitHub Pages
 
-The private source repository keeps the React/Vite implementation and builds a
-`github-pages-site` artifact through
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml). The public
-`rsm23/haired-releases` repository contains only the generated HTML/assets,
-release notes, checksums, and desktop packages. This keeps application source
-private while allowing the landing page and installers to be public.
+The public `rsm23/haired` repository contains the application source, GitHub
+Pages workflow, release notes, checksums, and desktop packages in one place.
+On every push to `main`,
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml) builds `apps/web`
+and deploys `apps/web/dist` with GitHub's Pages Actions.
 
-To publish a generated site:
+To publish or refresh the site:
 
-1. Run `pnpm --filter @haired/web build` in the private source checkout.
-2. Copy the contents of `apps/web/dist/` to the root of the public
-   `haired-releases` repository without copying source files or `.env` files.
-3. In **haired-releases → Settings → Pages**, choose **Deploy from a branch**,
-   select `main` and `/ (root)`, then save.
-4. Open `https://rsm23.github.io/haired-releases/` and verify the download
-   section, legal/help hash routes, and release links.
+1. Push the intended source commit to `main`.
+2. In **haired → Settings → Pages**, set the source to **GitHub Actions**.
+3. Wait for **Deploy landing page to GitHub Pages** to succeed.
+4. Open `https://rsm23.github.io/haired/` and verify the download section,
+   legal/help hash routes, source link, and release links.
 
 The Vite config uses `base: './'`, and the site uses hash-based legal/help
 routes. No custom 404 rewrite is required for repository Pages URLs. Release
@@ -508,9 +505,9 @@ never be used in the website build.
 | `VITE_SUPPORT_EMAIL` | Web | Support address shown on the help page |
 | `VITE_GITHUB_URL` | Web | Optional source-link destination; hidden when empty |
 | `VITE_RELEASE_VERSION` | Web | Published preview tag used to construct direct installer URLs |
-| `VITE_RELEASE_REPOSITORY_URL` | Web | Public repository that hosts Pages, releases, checksums, and installers |
+| `VITE_RELEASE_REPOSITORY_URL` | Web | Public repository that hosts source, releases, checksums, and installers |
 | `VITE_RELEASE_OWNER` | Desktop release | Owner of the public updater/release repository |
-| `VITE_RELEASE_REPO` | Desktop release | Updater/release repository, normally `haired-releases` |
+| `VITE_RELEASE_REPO` | Desktop release | Updater/release repository, normally `haired` |
 
 These are public build-time values. Never add AI-provider keys, access tokens,
 signing certificates, or GitHub App private keys to Vite variables.
@@ -552,9 +549,7 @@ HAIRED_LIVE_CODEX=1 pnpm --filter @haired/desktop test
 ```
 
 CI runs `pnpm check` on pushes to `main` and pull requests. Dependency review
-and CodeQL run when GitHub exposes those services for the repository; they are
-skipped for the private source repository unless GitHub Advanced Security is
-enabled.
+and CodeQL run for the public repository.
 
 ### Local desktop package
 
@@ -571,9 +566,9 @@ The distributable preview configuration uses the package identifier
 `com.seifelmoulouk.hiarded` and can be built without signing credentials:
 
 ```sh
-VITE_PUBLIC_APP_URL=https://rsm23.github.io/haired-releases/ \
+VITE_PUBLIC_APP_URL=https://rsm23.github.io/haired/ \
 VITE_RELEASE_OWNER=rsm23 \
-VITE_RELEASE_REPO=haired-releases \
+VITE_RELEASE_REPO=haired \
 CSC_IDENTITY_AUTO_DISCOVERY=false \
 pnpm --filter @haired/desktop dist:preview
 ```
@@ -597,12 +592,9 @@ The workflow requires Apple Developer ID signing/notarization inputs and Azure
 Trusted Signing inputs. It runs `pnpm check`, rejects source maps and common
 secret patterns, verifies platform signatures, creates SPDX SBOMs and SHA-256
 checksums, and uploads all platforms to a draft release. Only after every build
-succeeds does it promote the release in the separate public
-`haired-releases` repository.
-
-The public repository is intentionally limited to signed installers, updater
-metadata, checksums, SBOMs, and release notes. A template is available at
-[docs/public-release-repository-README.md](docs/public-release-repository-README.md).
+succeeds does it promote the release in the same public `haired` repository.
+The workflow uses the repository-scoped GitHub Actions token, so it does not
+need a cross-repository GitHub App credential.
 
 Production desktop builds check for updates 15 seconds after launch and every
 six hours. A downloaded signed update can restart immediately or install when

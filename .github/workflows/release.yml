@@ -34,10 +34,10 @@ jobs:
     timeout-minutes: 45
     env:
       NODE_ENV: production
-      VITE_RELEASE_OWNER: ${{ vars.RELEASE_REPOSITORY_OWNER }}
-      VITE_RELEASE_REPO: haired-releases
-      VITE_PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL }}
-      VITE_SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL }}
+      VITE_RELEASE_OWNER: ${{ github.repository_owner }}
+      VITE_RELEASE_REPO: haired
+      VITE_PUBLIC_APP_URL: https://rsm23.github.io/haired/
+      VITE_SUPPORT_EMAIL: rahmani@seifelmoulouk.com
       CSC_LINK: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
       CSC_KEY_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -137,24 +137,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
-      - uses: actions/create-github-app-token@v2
-        id: release-token
-        with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          owner: ${{ vars.RELEASE_REPOSITORY_OWNER }}
-          repositories: haired-releases
-          permission-contents: write
       - name: Create draft, upload every platform, then promote
         env:
-          GH_TOKEN: ${{ steps.release-token.outputs.token }}
-          RELEASE_REPO: ${{ vars.RELEASE_REPOSITORY_OWNER }}/haired-releases
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           gh release create "$RELEASE_TAG" --repo "$RELEASE_REPO" --draft --verify-tag=false --title "Haired $RELEASE_TAG" --generate-notes

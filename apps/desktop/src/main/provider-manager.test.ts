@@ -54,8 +54,8 @@ describe('provider manager', () => {
     })
     const { manager, secrets } = managerFor(settings)
 
-    await manager.setApiKey('openai', 'sk-test-never-return-this')
-    expect(secrets.value?.openai).toBe('sk-test-never-return-this')
+    await manager.setApiKey('openai', 'test-secret-never-return-this')
+    expect(secrets.value?.openai).toBe('test-secret-never-return-this')
     const status = (await manager.statuses()).find((item) => item.id === 'openai')
     expect(status).toMatchObject({ hasKey: true, authenticated: true, ready: true })
     expect(JSON.stringify(status)).not.toContain('sk-test')

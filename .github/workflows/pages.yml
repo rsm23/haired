@@ -1,4 +1,4 @@
-name: Build landing page artifact
+name: Deploy landing page to GitHub Pages
 
 on:
   push:
@@ -7,6 +7,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -23,9 +29,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @haired/contracts build
       - run: pnpm --filter @haired/web build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages-site
           path: apps/web/dist
-          if-no-files-found: error
-          retention-days: 14
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -30,9 +30,9 @@ jobs:
     env:
       NODE_ENV: production
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      VITE_PUBLIC_APP_URL: https://rsm23.github.io/haired-releases/
+      VITE_PUBLIC_APP_URL: https://rsm23.github.io/haired/
       VITE_RELEASE_OWNER: rsm23
-      VITE_RELEASE_REPO: haired-releases
+      VITE_RELEASE_REPO: haired
       VITE_SUPPORT_EMAIL: rahmani@seifelmoulouk.com
     steps:
       - uses: actions/checkout@v4

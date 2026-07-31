@@ -20,7 +20,7 @@ Verify screen-recording onboarding and denial, permission changes that require r
 
 ## Update and provider gates
 
-- Upgrade a signed N-1 build through the public `haired-releases` repository on each platform.
+- Upgrade a signed N-1 build through the public `haired` repository on each platform.
 - Verify signature enforcement and preservation of settings and encrypted history.
 - Run synthetic-image smoke tests through Codex and Claude CLI login paths and every
   supported BYOK protocol without customer content.
