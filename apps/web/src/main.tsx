@@ -3,17 +3,19 @@ import ReactDOM from 'react-dom/client'
 import {
   ArrowRight,
   Braces,
-  Command,
+  CheckCircle2,
   Download,
   Eye,
-  KeyRound,
+  Laptop,
   LockKeyhole,
+  MonitorOff,
   MousePointer2,
   ScanSearch,
   Send,
   ShieldCheck,
   Sparkles,
   Terminal,
+  Video,
   Zap
 } from 'lucide-react'
 import anthropicLogo from '@lobehub/icons-static-svg/icons/anthropic.svg'
@@ -154,56 +156,98 @@ function Shell({ children, route }: { children: React.ReactNode; route: Route })
   )
 }
 
-function ProductFrame() {
+function SharePreview() {
   return (
-    <figure className="product-frame" aria-label="Haired selecting and explaining part of a workspace">
-      <div className="window-bar" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-        <i>Workspace</i>
-        <b>⌘ ⇧ A</b>
+    <figure
+      className="share-demo"
+      aria-label="Haired appears on your desktop while a supported Windows meeting share receives the workspace without the Haired window"
+    >
+      <div className="share-demo-meta">
+        <span className="share-live">
+          <i />
+          Screen-share privacy demo
+        </span>
+        <span>Supported Windows capture path</span>
       </div>
-      <div className="workspace-scene">
-        <img
-          src={WORKSPACE_IMAGE_URL}
-          alt="A dark technical workspace with code and a process diagram"
-          width="1586"
-          height="992"
-          loading="eager"
-          fetchPriority="high"
-        />
-        <div className="selection-box" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-          <i />
-        </div>
-        <aside className="answer-panel">
-          <div className="answer-panel-head">
-            <span className="answer-brand">
-              <span className="logo-mark" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
+
+      <div className="share-canvas">
+        <section className="desktop-view">
+          <header>
+            <span>
+              <Laptop />
+              Your desktop
+            </span>
+            <b>Private view</b>
+          </header>
+          <div className="desktop-surface">
+            <img
+              src={WORKSPACE_IMAGE_URL}
+              alt="A technical workspace with a Haired answer visible above it"
+              width="1586"
+              height="992"
+              loading="eager"
+              fetchPriority="high"
+            />
+            <div className="selection-frame" aria-hidden="true" />
+            <aside className="private-answer">
+              <span className="answer-brand">
+                <span className="logo-mark" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                HAIRED
               </span>
-              HAIRED
-            </span>
-            <span className="answer-provider">
-              <img src={codexLogo} alt="" />
-              Codex
-            </span>
+              <span>VISIBLE TO YOU</span>
+              <strong>The request is validated before it reaches your chosen provider.</strong>
+              <code>Fast · Codex</code>
+            </aside>
           </div>
-          <span className="answer-label">SELECTED REGION</span>
-          <h3>Explain this flow.</h3>
-          <p>
-            The selected branch validates the input, routes the request, and returns the safe
-            response without interrupting your current window.
-          </p>
-          <code>Fast answer · local provider</code>
-        </aside>
+        </section>
+
+        <div className="share-transfer" aria-hidden="true">
+          <ArrowRight />
+        </div>
+
+        <section className="meeting-view">
+          <header>
+            <span>
+              <Video />
+              Meeting share
+            </span>
+            <b>
+              <i /> Live
+            </b>
+          </header>
+          <div className="meeting-surface">
+            <img
+              src={WORKSPACE_IMAGE_URL}
+              alt=""
+              width="1586"
+              height="992"
+              aria-hidden="true"
+            />
+            <div className="excluded-stamp">
+              <MonitorOff />
+              <span>
+                <strong>Haired excluded</strong>
+                The shared workspace stays clear
+              </span>
+            </div>
+          </div>
+          <div className="meeting-apps" role="list" aria-label="Supported meeting applications">
+            <span role="listitem">Microsoft Teams</span>
+            <span role="listitem">Zoom</span>
+            <span role="listitem">Google Meet</span>
+          </div>
+        </section>
       </div>
+
+      <figcaption>
+        <strong>Windows 10/11:</strong> Haired requests OS-level exclusion before its windows are
+        shown. <span>macOS protection is best effort and must be verified in the live preview.</span>
+      </figcaption>
     </figure>
   )
 }
@@ -214,69 +258,71 @@ function Home() {
   return (
     <main>
       <section className="hero-section">
-        <div className="hero-grid" aria-hidden="true" />
-        <div className="hero-provider hero-provider-codex" aria-hidden="true">
-          <img src={codexLogo} alt="" />
-        </div>
-        <div className="hero-provider hero-provider-claude" aria-hidden="true">
-          <img src={claudeLogo} alt="" />
-        </div>
-        <div className="hero-provider hero-provider-gemini" aria-hidden="true">
-          <img src={geminiLogo} alt="" />
-        </div>
-        <div className="hero-provider hero-provider-mistral" aria-hidden="true">
-          <img src={mistralLogo} alt="" />
-        </div>
+        <div className="hero-ambient" aria-hidden="true" />
+        <div className="hero-layout">
+          <div className="hero-copy">
+            <span className="hero-kicker">
+              <ShieldCheck />
+              Private screen intelligence
+            </span>
+            <h1>
+              Answers stay <em>with you.</em>
+              <span>Not in your share.</span>
+            </h1>
+            <p>
+              Select anything on screen and ask your AI. On supported Windows capture paths,
+              Haired is designed to stay out of Microsoft Teams, Zoom, and Google Meet shares.
+            </p>
 
-        <div className="hero-copy">
-          <h1>
-            Ask anything
-            <br />
-            on your <em>screen.</em>
-          </h1>
-          <p>
-            Select any region. Get an answer from Codex, Claude, or your own API key—without
-            leaving what you’re doing.
-          </p>
-          <div className="hero-actions">
-            <Button asChild size="lg">
-              <a href={DOWNLOAD_URL}>
-                <Download data-icon="inline-start" />
-                Download Haired
+            <div className="meeting-list" role="list" aria-label="Supported meeting applications">
+              {['Microsoft Teams', 'Zoom', 'Google Meet'].map((app) => (
+                <span key={app} role="listitem">
+                  <CheckCircle2 />
+                  {app}
+                </span>
+              ))}
+            </div>
+
+            <div className="hero-actions">
+              <Button asChild size="lg">
+                <a href={DOWNLOAD_URL}>
+                  <Download data-icon="inline-start" />
+                  Download Haired
+                </a>
+              </Button>
+              <a className="text-link" href="#product">
+                Explore the workflow
+                <ArrowRight />
               </a>
-            </Button>
-            <a className="text-link" href="#product">
-              See how it works
-              <ArrowRight />
-            </a>
-          </div>
-          <div className="hero-proof" aria-label="Haired product facts">
-            <span>Free app</span>
-            <i />
-            <span>Local credentials</span>
-            <i />
-            <span>No Haired credits</span>
-          </div>
-        </div>
+            </div>
 
-        <ProductFrame />
+            <p className="hero-caveat">
+              <strong>Windows 10/11:</strong> OS-level exclusion on supported capture paths.
+              <span>
+                <strong>macOS:</strong> best effort—always check the live share preview.
+              </span>
+            </p>
+          </div>
+
+          <SharePreview />
+        </div>
       </section>
 
-      <section className="trust-rail" aria-label="Credential and provider architecture">
+      <section className="trust-rail" aria-label="Screen-sharing privacy boundary">
         <div>
-          <Command />
-          <strong>Use your CLI login</strong>
-          <span>Codex and Claude stay signed in through their own tools.</span>
+          <MonitorOff />
+          <strong>Hidden from supported Windows shares</strong>
+          <span>Haired requests capture exclusion before every app window is shown.</span>
         </div>
         <div>
-          <KeyRound />
-          <strong>Bring your own key</strong>
-          <span>Choose OpenAI, Anthropic, Gemini, Mistral, or a compatible API.</span>
+          <Video />
+          <strong>Teams, Zoom & Google Meet</strong>
+          <span>Designed for supported full-display and window-sharing capture paths.</span>
         </div>
         <div>
           <ShieldCheck />
-          <strong>Keep credentials local</strong>
-          <span>Saved keys use operating-system encryption on this computer.</span>
+          <strong>Verify the real share preview</strong>
+          <span>Meeting apps and macOS can change behavior; Haired never promises invisibility.</span>
         </div>
       </section>
 

@@ -963,6 +963,11 @@
   color: var(--foreground);
 }
 
+:root[data-theme="black"] .provider-logo-openai img,
+:root[data-theme="black"] .provider-logo-anthropic img {
+  filter: invert(1);
+}
+
 .provider-identity {
   display: flex;
   min-width: 0;
