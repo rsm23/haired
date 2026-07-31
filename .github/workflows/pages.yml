@@ -21,6 +21,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @haired/contracts build
       - run: pnpm --filter @haired/web build
       - uses: actions/upload-artifact@v4
         with:
