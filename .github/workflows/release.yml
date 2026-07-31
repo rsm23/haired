@@ -117,7 +117,15 @@ jobs:
         shell: bash
         run: |
           cd apps/desktop/release
-          find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS-${{ matrix.artifact }}.txt
+          if command -v shasum >/dev/null 2>&1; then
+            HASH_COMMAND=(shasum -a 256)
+          else
+            HASH_COMMAND=(sha256sum)
+          fi
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS*.txt' -print0 \
+            | sort -z \
+            | xargs -0 "${HASH_COMMAND[@]}" \
+            > SHA256SUMS-${{ matrix.artifact }}.txt
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
