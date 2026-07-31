@@ -3,9 +3,9 @@ import ReactDOM from 'react-dom/client'
 import {
   ArrowRight,
   Braces,
-  CheckCircle2,
   Download,
   Eye,
+  History,
   Laptop,
   LockKeyhole,
   MonitorOff,
@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import './styles.css'
 
-const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'support@example.invalid'
+const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'rahmani@seifelmoulouk.com'
 const DOWNLOAD_URL = import.meta.env.VITE_DOWNLOAD_URL || '#/help'
 const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || ''
 const WORKSPACE_IMAGE_URL = `${import.meta.env.BASE_URL}assets/haired-workspace.jpg`
@@ -81,21 +81,60 @@ const apiProviders: Provider[] = [
 const workflowSteps = [
   {
     number: '01',
-    title: 'Select',
-    description: 'Drag over any region.',
+    title: 'Capture the question',
+    description: 'Select a coding prompt, error, diagram, terminal output, or any useful screen region.',
     icon: ScanSearch
   },
   {
     number: '02',
-    title: 'Ask',
-    description: 'Use a default prompt or type your own.',
+    title: 'Choose how to solve it',
+    description: 'Get an instant solution or add your own question, constraints, and preferred answer depth.',
     icon: Sparkles
   },
   {
     number: '03',
-    title: 'Continue',
-    description: 'Read the answer without leaving context.',
+    title: 'Learn and continue',
+    description: 'Read the answer over your workspace, copy the code, ask a follow-up, or return to it later.',
     icon: Eye
+  }
+]
+
+const capabilityHighlights = [
+  {
+    title: 'Solve complete coding exercises',
+    description:
+      'Turn a selected prompt, TODO, or broken snippet into an actionable solution with complete code when the task calls for it.',
+    icon: Braces
+  },
+  {
+    title: 'Debug errors and failing tests',
+    description:
+      'Capture stack traces, terminal output, compiler errors, or test failures and get a focused diagnosis with concrete next steps.',
+    icon: Terminal
+  },
+  {
+    title: 'Understand the reasoning',
+    description:
+      'Ask for a walkthrough, compare approaches, clarify a concept, or explore the trade-offs behind an implementation.',
+    icon: Sparkles
+  },
+  {
+    title: 'Choose Fast or Deep answers',
+    description:
+      'Use Fast for a direct fix and Deep for multi-step problems, checked assumptions, alternatives, and careful analysis.',
+    icon: Zap
+  },
+  {
+    title: 'Control what you read',
+    description:
+      'Switch between Code only and Full reply, then tune the overlay theme, opacity, shortcuts, position, and optional magnifier.',
+    icon: Eye
+  },
+  {
+    title: 'Revisit, refine, and export',
+    description:
+      'Search encrypted local history, continue with follow-up questions, rerun an answer, copy it, or export it as Markdown.',
+    icon: History
   }
 ]
 
@@ -280,25 +319,18 @@ function Home() {
           <div className="hero-copy">
             <span className="hero-kicker">
               <ShieldCheck />
-              Private screen intelligence
+              Technical interview & coding copilot
             </span>
             <h1>
-              Answers stay <em>with you.</em>
-              <span>Not in your share.</span>
+              Get unstuck. <em>Get better.</em>
+              <span>Get closer to hired.</span>
             </h1>
             <p>
-              Select anything on screen and ask your AI. On supported Windows capture paths,
-              Haired is designed to stay out of Microsoft Teams, Zoom, and Google Meet shares.
+              Haired helps you prepare for technical interviews and solve real coding problems
+              without breaking your flow. Select a question, error, code sample, or diagram on
+              your screen, then get a direct solution, complete code, or a deeper explanation from
+              the AI provider you choose.
             </p>
-
-            <div className="meeting-list" role="list" aria-label="Supported meeting applications">
-              {['Microsoft Teams', 'Zoom', 'Google Meet'].map((app) => (
-                <span key={app} role="listitem">
-                  <CheckCircle2 />
-                  {app}
-                </span>
-              ))}
-            </div>
 
             <div className="hero-actions">
               <Button asChild size="lg">
@@ -308,15 +340,20 @@ function Home() {
                 </a>
               </Button>
               <a className="text-link" href="#product">
-                Explore the workflow
+                See everything Haired can do
                 <ArrowRight />
               </a>
             </div>
 
             <p className="hero-caveat">
-              <strong>Windows 10/11:</strong> OS-level exclusion on supported capture paths.
+              <strong>Screen-sharing privacy:</strong> Windows 10/11 can request OS-level exclusion
+              on supported capture paths.
               <span>
                 <strong>macOS:</strong> best effort—always check the live share preview.
+              </span>
+              <span>
+                <strong>Responsible use:</strong> use Haired in assessments only when AI assistance
+                is permitted, and disclose it when required.
               </span>
             </p>
           </div>
@@ -327,32 +364,55 @@ function Home() {
 
       <section className="trust-rail" aria-label="Screen-sharing privacy boundary">
         <div>
+          <Braces />
+          <strong>Prepare for the questions that get you hired</strong>
+          <span>Practice algorithms, debugging, system design, code review, and technical explanations.</span>
+        </div>
+        <div>
           <MonitorOff />
-          <strong>Hidden from supported Windows shares</strong>
-          <span>Haired requests capture exclusion before every app window is shown.</span>
+          <strong>Privacy controls for authorized screen sharing</strong>
+          <span>Haired requests capture exclusion on supported Windows sharing paths; always verify the live preview.</span>
         </div>
-        <div>
-          <Video />
-          <strong>Teams, Zoom & Google Meet</strong>
-          <span>Designed for supported full-display and window-sharing capture paths.</span>
+      </section>
+
+      <section className="capabilities-section section-grid" aria-labelledby="capabilities-title">
+        <div className="section-heading">
+          <h2 id="capabilities-title">
+            Build the skills.
+            <br />
+            <em>Earn the offer.</em>
+          </h2>
+          <p>
+            Use Haired as a focused technical-learning companion: practice before the interview,
+            work through difficult code, and turn every answer into something you understand and
+            can use.
+          </p>
         </div>
-        <div>
-          <ShieldCheck />
-          <strong>Verify the real share preview</strong>
-          <span>Meeting apps and macOS can change behavior; Haired never promises invisibility.</span>
+
+        <div className="capability-grid">
+          {capabilityHighlights.map((capability) => {
+            const Icon = capability.icon
+            return (
+              <article key={capability.title}>
+                <Icon />
+                <h3>{capability.title}</h3>
+                <p>{capability.description}</p>
+              </article>
+            )
+          })}
         </div>
       </section>
 
       <section className="workflow-section section-grid" id="product">
         <div className="section-heading">
           <h2>
-            One shortcut.
+            See it. Ask it.
             <br />
-            Then you’re <em>back to work.</em>
+            <em>Solve it.</em>
           </h2>
           <p>
-            Capture only what matters, ask your question, and keep the answer above the screen
-            underneath.
+            Stay inside your editor, browser, terminal, or practice platform. Haired turns the
+            selected part of your screen into a focused conversation with your chosen AI.
           </p>
         </div>
 
@@ -378,12 +438,12 @@ function Home() {
           <div className="mode-copy">
             <h3>
               <em>{mode === 'fast' ? 'Fast' : 'Deep'}</em>{' '}
-              {mode === 'fast' ? 'for momentum.' : 'for the hard parts.'}
+              {mode === 'fast' ? 'when every second counts.' : 'when the reasoning matters.'}
             </h3>
             <p>
               {mode === 'fast'
-                ? 'A concise answer for definitions, summaries, and quick fixes.'
-                : 'A fuller analysis for ambiguity, comparisons, and careful reasoning.'}
+                ? 'Get a concise explanation, an exact correction, or the code you need to keep moving.'
+                : 'Work through ambiguity, architecture, trade-offs, edge cases, and multi-step solutions.'}
             </p>
             <ToggleGroup
               className="mode-toggle"
@@ -419,13 +479,13 @@ function Home() {
               <span>ANSWER</span>
               <h4>
                 {mode === 'fast'
-                  ? 'The selected handler validates, routes, and returns the response.'
-                  : 'The selected handler has three responsibilities: validation, provider routing, and safe response serialization.'}
+                  ? 'Fix the stale closure by using the functional state updater.'
+                  : 'Trace the async race, compare the viable fixes, and return the safest implementation with its trade-offs.'}
               </h4>
               <p>
                 {mode === 'fast'
-                  ? 'Use Deep when you want assumptions checked or tradeoffs compared.'
-                  : 'It keeps the provider boundary explicit while preserving a predictable local result path.'}
+                  ? 'Fast is ideal for syntax, definitions, targeted debugging, and direct coding answers.'
+                  : 'Deep checks assumptions and explains why the recommended approach is stronger than the alternatives.'}
               </p>
             </div>
           </div>
@@ -435,13 +495,14 @@ function Home() {
       <section className="providers-section section-grid" id="providers">
         <div className="section-heading">
           <h2>
-            Your AI access.
+            Your models. Your accounts.
             <br />
-            No <em>Haired subscription.</em>
+            <em>No Haired subscription.</em>
           </h2>
           <p>
-            Run downloaded models locally with LM Studio or Ollama, use an authenticated Codex or
-            Claude CLI, or bring your own API key.
+            Use an authenticated Codex or Claude CLI, automatically detect downloaded LM Studio
+            and Ollama models, or bring an OpenAI, Anthropic, Gemini, Mistral, or compatible API
+            key. Choose the model and reasoning level that fit the question.
           </p>
         </div>
 
@@ -526,9 +587,12 @@ function Home() {
       <section className="final-cta section-grid">
         <MousePointer2 aria-hidden="true" />
         <h2>
-          Get answers <em>without losing your place.</em>
+          Practice sharper. Solve faster. <em>Walk in ready.</em>
         </h2>
-        <p>One shortcut. Your provider. Your screen stays in context.</p>
+        <p>
+          Build confidence before the interview, keep support in context at work, and use Haired
+          in live assessments only when AI assistance is permitted.
+        </p>
         <Button asChild size="lg">
           <a href={DOWNLOAD_URL}>
             Download Haired

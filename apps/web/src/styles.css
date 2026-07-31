@@ -702,39 +702,6 @@
   line-height: 1.67;
 }
 
-.meeting-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  margin-top: 27px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.meeting-list > span {
-  display: inline-flex;
-  min-height: 43px;
-  align-items: center;
-  gap: 7px;
-  padding: 0 15px;
-  color: #ded7d2;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.meeting-list > span:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.meeting-list svg {
-  width: 13px;
-  height: 13px;
-  color: #64bd81;
-}
-
 .hero-actions {
   margin-top: 32px;
 }
@@ -1122,7 +1089,7 @@
 .trust-rail {
   display: grid;
   width: min(var(--page-width), calc(100% - 48px));
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   margin: 0 auto;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -1178,8 +1145,48 @@
   z-index: 1;
 }
 
+.capabilities-section {
+  padding: 150px 0 20px;
+}
+
+.capability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 66px;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+.capability-grid article {
+  min-height: 245px;
+  padding: 34px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: rgba(13, 13, 13, 0.6);
+}
+
+.capability-grid svg {
+  width: 24px;
+  height: 24px;
+  color: var(--orange);
+}
+
+.capability-grid h3 {
+  margin: 44px 0 12px;
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.capability-grid p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
 .workflow-section {
-  padding: 160px 0 140px;
+  padding: 130px 0 140px;
 }
 
 .section-heading {
@@ -1734,6 +1741,10 @@ footer > div a {
     gap: 35px;
   }
 
+  .capability-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .workflow-rail {
     gap: 32px;
   }
@@ -1900,6 +1911,24 @@ footer > div a {
 
   .workflow-section {
     padding: 115px 0 100px;
+  }
+
+  .capabilities-section {
+    padding-top: 105px;
+  }
+
+  .capability-grid {
+    grid-template-columns: 1fr;
+    margin-top: 48px;
+  }
+
+  .capability-grid article {
+    min-height: 0;
+    padding: 28px 24px;
+  }
+
+  .capability-grid h3 {
+    margin-top: 25px;
   }
 
   .section-heading h2 {
@@ -2097,24 +2126,6 @@ footer > div a {
   .hero-copy > p {
     margin-top: 24px;
     font-size: 14px;
-  }
-
-  .meeting-list {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr;
-  }
-
-  .meeting-list > span,
-  .meeting-list > span:first-child {
-    min-height: 39px;
-    padding: 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-left: 0;
-  }
-
-  .meeting-list > span:first-child {
-    border-top: 0;
   }
 
   .hero-caveat {

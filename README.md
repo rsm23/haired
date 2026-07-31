@@ -458,7 +458,7 @@ as `#/privacy` should all work from this nested URL.
 The web app reads Vite variables at build/start time. For a temporary preview:
 
 ```sh
-VITE_SUPPORT_EMAIL=hello@example.com \
+VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com \
 VITE_DOWNLOAD_URL=https://example.com/download \
 VITE_GITHUB_URL=https://github.com/example/haired \
 pnpm dev:web
@@ -467,7 +467,7 @@ pnpm dev:web
 Alternatively, create an ignored `apps/web/.env.local` file:
 
 ```dotenv
-VITE_SUPPORT_EMAIL=hello@example.com
+VITE_SUPPORT_EMAIL=rahmani@seifelmoulouk.com
 VITE_DOWNLOAD_URL=https://example.com/download
 VITE_GITHUB_URL=https://github.com/example/haired
 ```
@@ -615,11 +615,11 @@ Build again and use the nested static preview documented above. Keep asset URLs
 relative to `import.meta.env.BASE_URL`, keep Vite `base: './'`, and use hash
 routes instead of browser-history routes.
 
-### The website shows a placeholder support address
+### The website shows the wrong support address
 
-Set `VITE_SUPPORT_EMAIL` before `pnpm dev:web` or before the production build.
-Vite embeds it at build time, so restarting/rebuilding is required after a
-change.
+The built-in address is `rahmani@seifelmoulouk.com`. If `VITE_SUPPORT_EMAIL` is
+set, it overrides that address at build time. Update or remove the override,
+then restart/rebuild the site.
 
 ### A download button opens Help instead of a release
 
