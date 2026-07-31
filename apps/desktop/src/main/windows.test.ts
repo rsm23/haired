@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { BrowserWindow } from 'electron'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -51,7 +52,7 @@ describe('renderer loading', () => {
     await loadRenderer(window, { kind: 'selector', mode: 'instant' })
 
     expect(window.loadFile).toHaveBeenCalledWith(
-      expect.stringContaining('renderer/index.html'),
+      expect.stringContaining(path.join('renderer', 'index.html')),
       { query: { kind: 'selector', mode: 'instant' } }
     )
     expect(process.env.ELECTRON_RENDERER_URL).toBeUndefined()
