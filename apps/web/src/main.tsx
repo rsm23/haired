@@ -22,7 +22,9 @@ import anthropicLogo from '@lobehub/icons-static-svg/icons/anthropic.svg'
 import claudeLogo from '@lobehub/icons-static-svg/icons/claudecode-color.svg'
 import codexLogo from '@lobehub/icons-static-svg/icons/codex-color.svg'
 import geminiLogo from '@lobehub/icons-static-svg/icons/gemini-color.svg'
+import lmStudioLogo from '@lobehub/icons-static-svg/icons/lmstudio.svg'
 import mistralLogo from '@lobehub/icons-static-svg/icons/mistral-color.svg'
+import ollamaLogo from '@lobehub/icons-static-svg/icons/ollama.svg'
 import openAiLogo from '@lobehub/icons-static-svg/icons/openai.svg'
 import type { AnalysisMode } from '@haired/contracts'
 import { Button } from '@/components/ui/button'
@@ -51,6 +53,21 @@ type Provider = {
 const cliProviders: Array<Provider & { command: string }> = [
   { name: 'Codex CLI', logo: codexLogo, command: 'codex login' },
   { name: 'Claude Code', logo: claudeLogo, command: 'claude auth login' }
+]
+
+const localProviders: Array<Provider & { command: string }> = [
+  {
+    name: 'LM Studio',
+    logo: lmStudioLogo,
+    className: 'provider-logo-monochrome',
+    command: 'localhost:1234'
+  },
+  {
+    name: 'Ollama',
+    logo: ollamaLogo,
+    className: 'provider-logo-monochrome',
+    command: 'localhost:11434'
+  }
 ]
 
 const apiProviders: Provider[] = [
@@ -423,8 +440,8 @@ function Home() {
             No <em>Haired subscription.</em>
           </h2>
           <p>
-            Use an authenticated Codex or Claude CLI, or bring your own key for OpenAI, Anthropic,
-            Gemini, Mistral, and compatible APIs.
+            Run downloaded models locally with LM Studio or Ollama, use an authenticated Codex or
+            Claude CLI, or bring your own API key.
           </p>
         </div>
 
@@ -437,6 +454,24 @@ function Home() {
             <div className="provider-list">
               {cliProviders.map((provider) => (
                 <article className="provider-item cli-provider-item" key={provider.name}>
+                  <ProviderMark provider={provider} />
+                  <strong>{provider.name}</strong>
+                  <code>{provider.command}</code>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="provider-divider" aria-hidden="true" />
+
+          <div className="provider-group local-group">
+            <div className="provider-group-title">
+              <span>Run models locally</span>
+              <i />
+            </div>
+            <div className="provider-list">
+              {localProviders.map((provider) => (
+                <article className="provider-item local-provider-item" key={provider.name}>
                   <ProviderMark provider={provider} />
                   <strong>{provider.name}</strong>
                   <code>{provider.command}</code>
@@ -467,8 +502,8 @@ function Home() {
           <div>
             <LockKeyhole />
             <span>
-              <strong>Credentials stay</strong>
-              on this computer
+              <strong>Local models run</strong>
+              on your computer
             </span>
           </div>
           <div>
@@ -517,9 +552,10 @@ function Legal({ kind }: { kind: 'privacy' | 'terms' }) {
         <>
           <h2>Provider connections</h2>
           <p>
-            Codex and Claude connections run through their locally installed CLIs. BYOK requests
-            are sent directly from the desktop app to the endpoint you configure; Haired does not
-            operate an AI proxy or receive your provider key.
+            LM Studio and Ollama requests go to the local server URL you configure. Codex and
+            Claude connections run through their locally installed CLIs. BYOK requests are sent
+            directly from the desktop app to your configured endpoint; Haired does not operate an
+            AI proxy or receive your provider key.
           </p>
           <h2>Local storage</h2>
           <p>
@@ -567,13 +603,20 @@ function Help() {
         <code>claude auth login</code>. Open Haired → AI providers, activate the matching CLI,
         refresh status, and choose “Use this provider.”
       </p>
-      <h2>2. Or bring an API key</h2>
+      <h2>2. Or run a downloaded model locally</h2>
+      <p>
+        Start the LM Studio local server or Ollama, then activate that runtime in Haired. Haired
+        detects the models currently available from the server; choose a vision-capable model and
+        select “Use provider.” Use Refresh or “Detect models” after downloading or removing a
+        model.
+      </p>
+      <h2>3. Or bring an API key</h2>
       <p>
         Activate OpenAI, Anthropic, Gemini, Mistral, or the OpenAI-compatible provider. Set its
         endpoint and model, paste the key, save it, then select the provider. The raw key is not
         displayed again.
       </p>
-      <h2>3. Capture</h2>
+      <h2>4. Capture</h2>
       <p>
         Use the Select & answer or Select & ask shortcut. If a provider refuses the request, check
         its account limits, key permissions, model access, and endpoint.

@@ -5,9 +5,10 @@ a region of the screen, ask a question (or use a saved instruction), and read a
 streamed AI answer in an always-on-top overlay without leaving the application
 you are using.
 
-Haired connects either to an existing OpenAI Codex or Claude Code CLI login, or
-directly to an AI provider with an API key that you supply. It has no Haired
-account, hosted AI proxy, license key, paid plan, or usage-credit system.
+Haired connects to downloaded local models through LM Studio or Ollama, an
+existing OpenAI Codex or Claude Code CLI login, or directly to an AI provider
+with an API key that you supply. It has no Haired account, hosted AI proxy,
+license key, paid plan, or usage-credit system.
 
 ## Microsoft Teams, Zoom, and Google Meet screen sharing
 
@@ -78,8 +79,10 @@ flowchart LR
     C --> D["Electron main process"]
     D --> E{"Selected provider"}
     E -->|"Existing login"| F["Codex or Claude CLI"]
+    E -->|"Local runtime"| K["LM Studio or Ollama"]
     E -->|"BYOK"| G["Provider HTTPS API"]
     F --> H["Streamed Markdown answer"]
+    K --> H
     G --> H
     H --> I["Protected answer overlay"]
     H --> J["Encrypted local history"]
@@ -91,17 +94,20 @@ shared request schemas before performing capture, provider, history, clipboard,
 or filesystem operations.
 
 There is intentionally no Haired API service or payment stack. Requests travel
-from the desktop main process directly to the selected CLI or provider API.
+from the desktop main process directly to the selected CLI, local runtime, or
+provider API.
 
 ## Providers
 
-Haired supports two local CLI connections and five bring-your-own-key (BYOK)
-connections:
+Haired supports two local model runtimes, two local CLI connections, and five
+bring-your-own-key (BYOK) connections:
 
 | Provider | Connection | Authentication | Default model/configuration |
 |---|---|---|---|
 | OpenAI Codex | `codex app-server` | Existing `codex login` | Provider default; editable model and reasoning effort |
 | Claude Code | Non-interactive `claude` stream JSON | Existing `claude auth login` | `sonnet`; editable model and reasoning effort |
+| LM Studio | Local OpenAI-compatible Chat Completions API | None by default | Live discovery from `GET /v1/models`; default endpoint `http://127.0.0.1:1234/v1` |
+| Ollama | Native local Chat API | None on the local API | Live discovery from `GET /api/tags`; default endpoint `http://127.0.0.1:11434` |
 | OpenAI | Responses API | Locally saved API key | `gpt-5.6-terra` |
 | Anthropic | Messages API | Locally saved API key | `claude-sonnet-4-6` |
 | Google Gemini | `streamGenerateContent` | Locally saved API key | `gemini-3.5-flash` |
@@ -110,6 +116,13 @@ connections:
 
 Every provider has an explicit activation switch. Only a provider that is
 enabled, configured, authenticated, and ready can be selected.
+
+When LM Studio or Ollama is active, **Refresh** and **Detect models** query the
+running server and replace the model dropdown with the models currently
+reported as available/downloaded. A removed model is no longer offered and the
+runtime is marked not ready until another model is selected. Because Haired
+sends a screenshot with every analysis request, select a model with vision/image
+input support; a text-only model will reject or ignore the crop.
 
 CLI providers reuse their own login files. BYOK secrets are encrypted with
 Electron `safeStorage` (macOS Keychain or Windows DPAPI), are never displayed
@@ -168,6 +181,9 @@ The desktop settings UI contains five sections:
 
 - Detect, configure, activate, and select Codex and Claude CLI installations.
 - Select a CLI model and automatic or explicit reasoning effort.
+- Detect downloaded LM Studio and Ollama models from their local servers.
+- Select a discovered vision-capable local model; removed models invalidate the
+  previous selection on refresh.
 - Configure, activate, and select BYOK providers.
 - Edit an OpenAI-compatible base URL and model.
 - Save, replace, or clear encrypted API keys.
@@ -219,9 +235,14 @@ Vite assets so it works from a GitHub Pages repository subpath.
 - Haired does not write capture crops to temporary files.
 - Crops are constrained to 4,096 px on the longest edge and 8 million pixels,
   with a 10 MB PNG request limit.
-- Codex receives an inline data URL. Claude and BYOK providers receive inline
-  base64 image content.
-- Requests go directly to the selected local CLI or remote provider endpoint.
+- Codex and LM Studio receive an inline data URL. Claude, Ollama, and BYOK
+  providers receive inline base64 image content.
+- Requests go directly to the selected local CLI, local model server, or remote
+  provider endpoint.
+- The default LM Studio and Ollama URLs are loopback-only. If you edit a local
+  runtime URL to point to another computer, Haired sends the screenshot and
+  prompt to that host; treat it as a network provider rather than on-device
+  inference.
 - Haired does not receive provider credentials, prompts, screenshots, or
   responses through a hosted service.
 
@@ -291,7 +312,8 @@ application.
 - Node.js 22.12 or newer (CI and release workflows use Node.js 24).
 - pnpm 11.10.0. The repository declares this version in `package.json`.
 - macOS 13+ or supported Windows for full desktop behavior.
-- A configured Codex/Claude CLI login or a provider API key for live answers.
+- A running LM Studio/Ollama server with a vision model, a configured
+  Codex/Claude CLI login, or a provider API key for live answers.
 
 If Corepack is available, activate the declared pnpm version:
 
@@ -326,6 +348,45 @@ claude auth login
 
 Then activate that provider under **Haired → AI providers**, refresh its status,
 and select it. Executable paths and models remain editable.
+
+### Local model connections
+
+Local inference requires a downloaded model that accepts images. Haired does
+not download, start, or update model runtimes for you; it detects the models
+reported by a server that is already running.
+
+The built-in local connections target the default unauthenticated loopback
+servers. If LM Studio is configured to require an API token, use Haired's
+OpenAI-compatible BYOK connection with that token and the LM Studio base URL.
+
+For **LM Studio**:
+
+1. Download a vision-capable model in LM Studio.
+2. Start the local server from **Developer**, or run `lms server start`.
+3. In **Haired → AI providers → Local models**, activate **LM Studio**. Keep the
+   default `http://127.0.0.1:1234/v1` URL unless the server uses another port.
+4. Choose a detected model, then select **Use provider**.
+
+LM Studio exposes its current model list through `GET /v1/models`; depending on
+its Just-in-Time loading setting, this can include downloaded models that are
+not loaded yet. See the official [LM Studio OpenAI-compatible API
+documentation](https://lmstudio.ai/docs/developer/openai-compat).
+
+For **Ollama**:
+
+1. Start Ollama (`ollama serve` when it is not already running).
+2. Download a vision-capable model with `ollama pull <vision-model>`.
+3. In **Haired → AI providers → Local models**, activate **Ollama**. Its default
+   URL is `http://127.0.0.1:11434`.
+4. Choose a detected model, then select **Use provider**.
+
+Ollama reports downloaded models through `GET /api/tags` and receives the crop
+through its native `POST /api/chat` image field. See the official [Ollama API
+documentation](https://docs.ollama.com/api/introduction).
+
+Use **Refresh** or **Detect models** after downloading, renaming, or deleting a
+model. Discovery always replaces the visible options with the server's current
+response; it does not rely on a bundled model catalog.
 
 ### BYOK connections
 
@@ -570,6 +631,15 @@ trusted release/download URL for the website build.
 Confirm the executable is on `PATH`, run `codex login` or `claude auth login`,
 then refresh that provider in Settings. If necessary, set its explicit
 executable path.
+
+### LM Studio or Ollama models do not appear
+
+Confirm the runtime is running and that its URL in **AI providers → Local
+models** is correct. Verify `http://127.0.0.1:1234/v1/models` for LM Studio or
+`http://127.0.0.1:11434/api/tags` for Ollama, then press **Detect models**. Empty
+results mean the server is reachable but is not reporting downloaded models.
+If a previously selected model was removed, Haired intentionally marks the
+provider not ready until you choose one of the newly detected models.
 
 ### Screen capture does not start on macOS
 

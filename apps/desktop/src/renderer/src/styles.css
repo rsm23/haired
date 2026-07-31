@@ -964,7 +964,9 @@
 }
 
 :root[data-theme="black"] .provider-logo-openai img,
-:root[data-theme="black"] .provider-logo-anthropic img {
+:root[data-theme="black"] .provider-logo-anthropic img,
+:root[data-theme="black"] .provider-logo-lm-studio img,
+:root[data-theme="black"] .provider-logo-ollama img {
   filter: invert(1);
 }
 
@@ -1193,6 +1195,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(150px, 0.8fr) minmax(0, 1.1fr);
   gap: 12px;
+}
+
+.local-provider-fields {
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
 }
 
 .api-key-field [data-slot="field-label"] {

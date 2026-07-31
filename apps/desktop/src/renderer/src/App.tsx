@@ -48,7 +48,9 @@ import anthropicLogo from '@lobehub/icons-static-svg/icons/anthropic.svg'
 import claudeLogo from '@lobehub/icons-static-svg/icons/claudecode-color.svg'
 import codexLogo from '@lobehub/icons-static-svg/icons/codex-color.svg'
 import geminiLogo from '@lobehub/icons-static-svg/icons/gemini-color.svg'
+import lmStudioLogo from '@lobehub/icons-static-svg/icons/lmstudio.svg'
 import mistralLogo from '@lobehub/icons-static-svg/icons/mistral-color.svg'
+import ollamaLogo from '@lobehub/icons-static-svg/icons/ollama.svg'
 import openAiLogo from '@lobehub/icons-static-svg/icons/openai.svg'
 import openRouterLogo from '@lobehub/icons-static-svg/icons/openrouter-color.svg'
 import { toast } from 'sonner'
@@ -235,6 +237,8 @@ const api = window.haired ?? unavailableApi
 const providerLogos: Record<ProviderId, string> = {
   codex: codexLogo,
   claude: claudeLogo,
+  'lm-studio': lmStudioLogo,
+  ollama: ollamaLogo,
   openai: openAiLogo,
   anthropic: anthropicLogo,
   gemini: geminiLogo,
@@ -245,6 +249,8 @@ const providerLogos: Record<ProviderId, string> = {
 function providerStateLabel(provider: BootstrapData['providers'][number]): string {
   if (!provider.enabled) return 'Not activated'
   if (provider.ready) return 'Ready'
+  if (provider.kind === 'local' && !provider.installed) return 'Server offline'
+  if (provider.kind === 'local') return 'Choose model'
   if (provider.kind === 'cli' && !provider.installed) return 'CLI not found'
   return 'Needs setup'
 }
@@ -529,6 +535,12 @@ function ProvidersPage({
       null
     )
   })
+  const [expandedLocal, setExpandedLocal] = useState<ProviderId | null>(() => {
+    return (
+      bootstrap.providers.find((provider) => provider.kind === 'local' && provider.selected)?.id ??
+      null
+    )
+  })
 
   async function refresh() {
     setBusy('refresh')
@@ -601,6 +613,7 @@ function ProvidersPage({
   }
 
   const cliProviders = bootstrap.providers.filter((provider) => provider.kind === 'cli')
+  const localProviders = bootstrap.providers.filter((provider) => provider.kind === 'local')
   const apiProviders = bootstrap.providers.filter((provider) => provider.kind === 'byok')
 
   return (
@@ -609,7 +622,7 @@ function ProvidersPage({
         <PageHeading
           eyebrow=""
           title="AI providers"
-          description="Use an installed CLI or connect your own API key. Requests go straight from this device to the provider."
+          description="Use an installed CLI, a local model runtime, or your own API key. Requests go directly to the connection you select."
         />
         <Button
           type="button"
@@ -630,7 +643,7 @@ function ProvidersPage({
         <span className="credential-band-icon"><ShieldCheck /></span>
         <div>
           <strong>Credentials stay on this computer</strong>
-          <span>CLI logins stay with their tools. API keys use operating-system encryption.</span>
+          <span>Default loopback runtimes need no key. CLI logins stay with their tools, and API keys use operating-system encryption.</span>
         </div>
       </div>
 
@@ -776,6 +789,155 @@ function ProvidersPage({
                     {provider.selected ? 'In use' : 'Use provider'}
                   </Button>
                 </footer>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="provider-section" aria-labelledby="local-models-heading">
+        <header className="provider-section-heading">
+          <h2 id="local-models-heading">Local models</h2>
+          <p>Detect downloaded models from a running LM Studio or Ollama server.</p>
+        </header>
+        <div className="api-provider-list local-provider-list">
+          {localProviders.map((provider) => {
+            const config = bootstrap.settings.providers[provider.id] as {
+              enabled: boolean
+              model: string
+              baseUrl: string
+            }
+            const expanded = expandedLocal === provider.id
+            const selectedModelMissing = Boolean(
+              config.model && !provider.models.includes(config.model)
+            )
+            return (
+              <article
+                key={provider.id}
+                className={cn(
+                  'api-provider',
+                  expanded && 'api-provider-expanded',
+                  provider.selected && 'provider-selected'
+                )}
+              >
+                <div className="api-provider-row">
+                  <button
+                    type="button"
+                    className="api-provider-summary"
+                    aria-expanded={expanded}
+                    aria-controls={provider.id + '-configuration'}
+                    onClick={() => setExpandedLocal(expanded ? null : provider.id)}
+                  >
+                    <ProviderLogo id={provider.id} name={provider.name} />
+                    <span className="provider-identity">
+                      <strong>{provider.name}</strong>
+                      <span className={cn('provider-state', provider.ready && 'provider-state-ready')}>
+                        <i />
+                        {providerStateLabel(provider)}
+                        {provider.selected && <b>· In use</b>}
+                      </span>
+                    </span>
+                  </button>
+                  <Switch
+                    checked={provider.enabled}
+                    disabled={busy === provider.id}
+                    aria-label={'Activate ' + provider.name}
+                    onCheckedChange={(enabled) =>
+                      void updateProvider(provider.id, { enabled })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={(expanded ? 'Collapse ' : 'Configure ') + provider.name}
+                    aria-expanded={expanded}
+                    onClick={() => setExpandedLocal(expanded ? null : provider.id)}
+                  >
+                    <ChevronRight className={cn('provider-chevron', expanded && 'expanded')} />
+                  </Button>
+                </div>
+
+                {expanded && (
+                  <div
+                    id={provider.id + '-configuration'}
+                    className="api-provider-config"
+                  >
+                    <div className="api-provider-fields local-provider-fields">
+                      <Field>
+                        <FieldLabel htmlFor={provider.id + '-base-url'}>Local server URL</FieldLabel>
+                        <Input
+                          id={provider.id + '-base-url'}
+                          defaultValue={config.baseUrl}
+                          spellCheck={false}
+                          autoComplete="url"
+                          onBlur={(event) => {
+                            const baseUrl = event.target.value.trim()
+                            if (baseUrl && baseUrl !== config.baseUrl) {
+                              void updateProvider(provider.id, { baseUrl })
+                            }
+                          }}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor={provider.id + '-model'}>
+                          Downloaded model (vision required)
+                        </FieldLabel>
+                        <Select
+                          disabled={busy === provider.id || provider.models.length === 0}
+                          value={config.model || '__select_model__'}
+                          onValueChange={(model) =>
+                            model !== '__select_model__' &&
+                            void updateProvider(provider.id, { model })
+                          }
+                        >
+                          <SelectTrigger id={provider.id + '-model'}>
+                            <SelectValue placeholder="Choose a model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {!config.model && (
+                                <SelectItem value="__select_model__" disabled>
+                                  Choose a model
+                                </SelectItem>
+                              )}
+                              {selectedModelMissing && (
+                                <SelectItem value={config.model} disabled>
+                                  Unavailable: {config.model}
+                                </SelectItem>
+                              )}
+                              {provider.models.map((model) => (
+                                <SelectItem key={model} value={model}>{model}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </div>
+
+                    <footer className="api-provider-actions">
+                      <p>{provider.detail}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={Boolean(busy)}
+                        onClick={() => void refresh()}
+                      >
+                        {busy === 'refresh' && <Spinner data-icon="inline-start" />}
+                        Detect models
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!provider.ready || provider.selected || busy === provider.id}
+                        onClick={() => void selectProvider(provider.id)}
+                      >
+                        {provider.selected ? 'In use' : 'Use provider'}
+                      </Button>
+                    </footer>
+                  </div>
+                )}
               </article>
             )
           })}

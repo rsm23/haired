@@ -82,6 +82,8 @@ export const DEFAULT_INSTRUCTION = [
 export const providerIdSchema = z.enum([
   'codex',
   'claude',
+  'lm-studio',
+  'ollama',
   'openai',
   'anthropic',
   'gemini',
@@ -116,6 +118,12 @@ const apiProviderSettingsSchema = z.object({
   model: z.string().trim().min(1).max(160)
 })
 
+const localProviderSettingsSchema = z.object({
+  enabled: z.boolean(),
+  baseUrl: z.string().url().max(2_048),
+  model: z.string().trim().max(160)
+})
+
 export const providerSettingsSchema = z.object({
   selected: providerIdSchema.default('codex'),
   codex: codexCliProviderSettingsSchema.default({
@@ -129,6 +137,16 @@ export const providerSettingsSchema = z.object({
     binaryPath: 'claude',
     model: 'sonnet',
     reasoningEffort: 'auto'
+  }),
+  'lm-studio': localProviderSettingsSchema.default({
+    enabled: false,
+    baseUrl: 'http://127.0.0.1:1234/v1',
+    model: ''
+  }),
+  ollama: localProviderSettingsSchema.default({
+    enabled: false,
+    baseUrl: 'http://127.0.0.1:11434',
+    model: ''
   }),
   openai: apiProviderSettingsSchema.default({
     enabled: false,
@@ -161,7 +179,7 @@ export type ProviderSettings = z.infer<typeof providerSettingsSchema>
 export const providerStatusSchema = z.object({
   id: providerIdSchema,
   name: z.string(),
-  kind: z.enum(['cli', 'byok']),
+  kind: z.enum(['cli', 'local', 'byok']),
   enabled: z.boolean(),
   selected: z.boolean(),
   installed: z.boolean(),

@@ -129,6 +129,187 @@ describe('provider manager', () => {
     vi.unstubAllGlobals()
   })
 
+  it('refreshes LM Studio and Ollama model options from their downloaded models', async () => {
+    const settings = appSettingsSchema.parse({
+      providers: {
+        'lm-studio': {
+          enabled: true,
+          baseUrl: 'http://127.0.0.1:1234/v1',
+          model: 'qwen2-vl'
+        },
+        ollama: {
+          enabled: true,
+          baseUrl: 'http://127.0.0.1:11434',
+          model: 'llava:latest'
+        }
+      }
+    })
+    const { manager } = managerFor(settings)
+    let refresh = 0
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      const address = String(url)
+      if (address.endsWith('/v1/models')) {
+        return Response.json({
+          data: refresh === 0 ? [{ id: 'qwen2-vl' }, { id: 'pixtral-12b' }] : [{ id: 'gemma-3-12b' }]
+        })
+      }
+      if (address.endsWith('/api/tags')) {
+        const response = Response.json({
+          models:
+            refresh === 0
+              ? [{ model: 'llava:latest' }, { name: 'gemma3:12b' }]
+              : [{ model: 'qwen2.5vl:7b' }]
+        })
+        refresh += 1
+        return response
+      }
+      throw new Error(`Unexpected URL: ${address}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const first = await manager.statuses()
+    expect(first.find((provider) => provider.id === 'lm-studio')).toMatchObject({
+      ready: true,
+      models: ['pixtral-12b', 'qwen2-vl']
+    })
+    expect(first.find((provider) => provider.id === 'ollama')).toMatchObject({
+      ready: true,
+      models: ['gemma3:12b', 'llava:latest']
+    })
+
+    const refreshed = await manager.statuses()
+    expect(refreshed.find((provider) => provider.id === 'lm-studio')).toMatchObject({
+      ready: false,
+      models: ['gemma-3-12b']
+    })
+    expect(refreshed.find((provider) => provider.id === 'ollama')).toMatchObject({
+      ready: false,
+      models: ['qwen2.5vl:7b']
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    vi.unstubAllGlobals()
+  })
+
+  it('streams a vision request through LM Studio without an API key', async () => {
+    const settings = appSettingsSchema.parse({
+      providers: {
+        selected: 'lm-studio',
+        'lm-studio': {
+          enabled: true,
+          baseUrl: 'http://127.0.0.1:1234',
+          model: 'qwen2-vl'
+        }
+      }
+    })
+    const { manager } = managerFor(settings)
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe('http://127.0.0.1:1234/v1/chat/completions')
+      expect(init?.headers).not.toHaveProperty('authorization')
+      const body = JSON.parse(String(init?.body))
+      expect(body).toMatchObject({
+        model: 'qwen2-vl',
+        stream: true,
+        stream_options: { include_usage: true }
+      })
+      expect(body.messages.at(-1).content[1]).toMatchObject({
+        type: 'image_url',
+        image_url: { url: expect.stringMatching(/^data:image\/png;base64,/) }
+      })
+      return new Response(
+        [
+          'data: {"choices":[{"delta":{"content":"LOCAL_OK"}}]}',
+          '',
+          'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2}}',
+          '',
+          ''
+        ].join('\n'),
+        { headers: { 'content-type': 'text/event-stream' } }
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const events: StreamEvent[] = []
+
+    await manager.analyze({
+      image: Buffer.from('image'),
+      metadata: {
+        requestId: crypto.randomUUID(),
+        mode: 'fast',
+        prompt: 'Analyze',
+        conversation: []
+      },
+      signal: new AbortController().signal,
+      onEvent: (event) => events.push(event)
+    })
+
+    expect(events.find((event) => event.type === 'delta')).toMatchObject({ text: 'LOCAL_OK' })
+    expect(events.find((event) => event.type === 'usage')).toMatchObject({
+      provider: 'lm-studio',
+      model: 'qwen2-vl',
+      inputTokens: 5,
+      outputTokens: 2
+    })
+    expect(events.at(-1)?.type).toBe('completed')
+    vi.unstubAllGlobals()
+  })
+
+  it('streams Ollama NDJSON with the selected crop as an image', async () => {
+    const settings = appSettingsSchema.parse({
+      providers: {
+        selected: 'ollama',
+        ollama: {
+          enabled: true,
+          baseUrl: 'http://127.0.0.1:11434/api/',
+          model: 'gemma3:12b'
+        }
+      }
+    })
+    const { manager } = managerFor(settings)
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe('http://127.0.0.1:11434/api/chat')
+      const body = JSON.parse(String(init?.body))
+      expect(body).toMatchObject({ model: 'gemma3:12b', stream: true })
+      expect(body.messages.at(-1).images).toEqual([Buffer.from('image').toString('base64')])
+      return new Response(
+        [
+          '{"message":{"role":"assistant","content":"OLLAMA"},"done":false}',
+          '{"message":{"role":"assistant","content":"_OK"},"done":false}',
+          '{"message":{"role":"assistant","content":""},"done":true,"prompt_eval_count":6,"eval_count":3}',
+          ''
+        ].join('\n'),
+        { headers: { 'content-type': 'application/x-ndjson' } }
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const events: StreamEvent[] = []
+
+    await manager.analyze({
+      image: Buffer.from('image'),
+      metadata: {
+        requestId: crypto.randomUUID(),
+        mode: 'deep',
+        prompt: 'Analyze',
+        conversation: []
+      },
+      signal: new AbortController().signal,
+      onEvent: (event) => events.push(event)
+    })
+
+    expect(
+      events
+        .filter((event): event is Extract<StreamEvent, { type: 'delta' }> => event.type === 'delta')
+        .map((event) => event.text)
+        .join('')
+    ).toBe('OLLAMA_OK')
+    expect(events.find((event) => event.type === 'usage')).toMatchObject({
+      provider: 'ollama',
+      model: 'gemma3:12b',
+      inputTokens: 6,
+      outputTokens: 3
+    })
+    expect(events.at(-1)?.type).toBe('completed')
+    vi.unstubAllGlobals()
+  })
+
   it('redacts recognizable credentials and emails from provider diagnostics', () => {
     expect(
       providerInternals.safeDetail(

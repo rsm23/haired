@@ -36,6 +36,16 @@ describe('shared contracts', () => {
       reasoningEffort: 'auto'
     })
     expect(settings.providers.claude.reasoningEffort).toBe('auto')
+    expect(settings.providers['lm-studio']).toMatchObject({
+      enabled: false,
+      baseUrl: 'http://127.0.0.1:1234/v1',
+      model: ''
+    })
+    expect(settings.providers.ollama).toMatchObject({
+      enabled: false,
+      baseUrl: 'http://127.0.0.1:11434',
+      model: ''
+    })
     expect(settings.providers.openai.enabled).toBe(false)
   })
 

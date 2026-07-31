@@ -40,6 +40,8 @@ interface RpcMessage {
 const providerNames: Record<ProviderId, string> = {
   codex: 'OpenAI Codex',
   claude: 'Claude Code',
+  'lm-studio': 'LM Studio',
+  ollama: 'Ollama',
   openai: 'OpenAI API',
   anthropic: 'Anthropic API',
   gemini: 'Google Gemini API',
@@ -54,6 +56,9 @@ const byokProviders = new Set<ProviderId>([
   'mistral',
   'openai-compatible'
 ])
+
+const localProviders = ['lm-studio', 'ollama'] as const
+type LocalProviderId = (typeof localProviders)[number]
 
 const providerModels: Partial<Record<ProviderId, string[]>> = {
   mistral: [
@@ -358,6 +363,43 @@ async function readSse(
   }
 }
 
+async function readNdjson(
+  response: Response,
+  onJson: (payload: any) => void,
+  signal: AbortSignal
+): Promise<void> {
+  if (!response.body) throw new Error('Provider returned no response stream')
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    if (signal.aborted) throw createAbortError()
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value, { stream: !done })
+    const lines = buffer.split(/\r?\n/)
+    buffer = lines.pop() ?? ''
+    if (done && buffer.trim()) lines.push(buffer)
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        onJson(JSON.parse(line))
+      } catch {
+        // Ignore non-JSON diagnostics from a local runtime.
+      }
+    }
+    if (done) break
+  }
+}
+
+function lmStudioApiBaseUrl(baseUrl: string): string {
+  const normalized = baseUrl.replace(/\/+$/, '')
+  return /\/v1$/i.test(normalized) ? normalized : `${normalized}/v1`
+}
+
+function ollamaApiBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, '').replace(/\/api$/i, '')
+}
+
 async function requireOk(response: Response): Promise<Response> {
   if (response.ok) return response
   let detail = `${response.status} ${response.statusText}`.trim()
@@ -424,7 +466,7 @@ export class ProviderManager {
 
   async setApiKey(rawProvider: unknown, rawKey: unknown): Promise<void> {
     const provider = providerIdSchema.parse(rawProvider)
-    if (!byokProviders.has(provider)) throw new Error('This provider uses its CLI login')
+    if (!byokProviders.has(provider)) throw new Error('This provider does not use an API key')
     if (typeof rawKey !== 'string') throw new Error('API key must be a string')
     const key = rawKey.trim()
     if (key.length < 8 || key.length > 2_048) throw new Error('Enter a valid API key')
@@ -434,7 +476,7 @@ export class ProviderManager {
 
   async clearApiKey(rawProvider: unknown): Promise<void> {
     const provider = providerIdSchema.parse(rawProvider)
-    if (!byokProviders.has(provider)) throw new Error('This provider uses its CLI login')
+    if (!byokProviders.has(provider)) throw new Error('This provider does not use an API key')
     const secrets = (await this.secretsFile.read()) ?? {}
     delete secrets[provider]
     if (Object.keys(secrets).length === 0) await this.secretsFile.clear()
@@ -444,9 +486,10 @@ export class ProviderManager {
   async statuses(): Promise<ProviderStatus[]> {
     const settings = await this.settingsStore.load()
     const secrets = (await this.secretsFile.read()) ?? {}
-    const [codex, claude] = await Promise.all([
+    const [codex, claude, ...localStatuses] = await Promise.all([
       this.codexStatus(settings),
-      this.claudeStatus(settings)
+      this.claudeStatus(settings),
+      ...localProviders.map((id) => this.localStatus(settings, id))
     ])
     const apiStatuses = (
       ['openai', 'anthropic', 'gemini', 'mistral', 'openai-compatible'] as ProviderId[]
@@ -470,7 +513,7 @@ export class ProviderManager {
         hasKey
       }
     })
-    return [codex, claude, ...apiStatuses]
+    return [codex, claude, ...localStatuses, ...apiStatuses]
   }
 
   async analyze(input: AnalysisInput): Promise<void> {
@@ -481,11 +524,13 @@ export class ProviderManager {
     input.onEvent({ type: 'started', requestId: input.metadata.requestId })
     if (provider === 'codex') await this.analyzeCodex(input, settings)
     else if (provider === 'claude') await this.analyzeClaude(input, settings)
+    else if (provider === 'lm-studio') {
+      await this.analyzeChatCompletions(input, settings, 'lm-studio')
+    } else if (provider === 'ollama') await this.analyzeOllama(input, settings)
     else if (provider === 'openai') await this.analyzeOpenAi(input, settings)
     else if (provider === 'mistral') {
       await this.analyzeChatCompletions(input, settings, 'mistral')
-    }
-    else if (provider === 'openai-compatible') {
+    } else if (provider === 'openai-compatible') {
       await this.analyzeChatCompletions(input, settings, 'openai-compatible')
     } else if (provider === 'anthropic') await this.analyzeAnthropic(input, settings)
     else await this.analyzeGemini(input, settings)
@@ -625,6 +670,74 @@ export class ProviderManager {
         detail: missing
           ? `Claude Code CLI was not found at “${config.binaryPath}”.`
           : safeDetail(detail, 'Claude Code is unavailable')
+      }
+    }
+  }
+
+  private async localStatus(
+    settings: AppSettings,
+    id: LocalProviderId
+  ): Promise<ProviderStatus> {
+    const config = settings.providers[id]
+    const base: ProviderStatus = {
+      id,
+      name: providerNames[id],
+      kind: 'local',
+      enabled: config.enabled,
+      selected: settings.providers.selected === id,
+      installed: false,
+      authenticated: false,
+      ready: false,
+      detail: `Activate ${providerNames[id]} to detect downloaded models.`,
+      model: config.model,
+      models: [],
+      hasKey: false
+    }
+    if (!config.enabled) return base
+
+    try {
+      const url =
+        id === 'lm-studio'
+          ? `${lmStudioApiBaseUrl(config.baseUrl)}/models`
+          : `${ollamaApiBaseUrl(config.baseUrl)}/api/tags`
+      const response = await requireOk(
+        await fetch(url, { signal: AbortSignal.timeout(2_500) })
+      )
+      const payload = (await response.json()) as any
+      const entries: any[] = id === 'lm-studio' ? payload?.data : payload?.models
+      const models = Array.from(
+        new Set(
+          (Array.isArray(entries) ? entries : [])
+            .map((entry) =>
+              id === 'lm-studio' ? entry?.id : (entry?.model ?? entry?.name)
+            )
+            .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+        )
+      ).sort((left, right) => left.localeCompare(right))
+      const selectedAvailable = Boolean(config.model && models.includes(config.model))
+      const detail =
+        models.length === 0
+          ? `${providerNames[id]} is running, but no downloaded models were found.`
+          : !config.model
+            ? `Detected ${models.length} model${models.length === 1 ? '' : 's'}. Choose a vision-capable model.`
+            : !selectedAvailable
+              ? `“${config.model}” is not available. Choose a downloaded model.`
+              : `Detected ${models.length} downloaded model${models.length === 1 ? '' : 's'}.`
+      return {
+        ...base,
+        installed: true,
+        authenticated: true,
+        ready: config.enabled && selectedAvailable,
+        detail,
+        models
+      }
+    } catch (error) {
+      return {
+        ...base,
+        detail: safeDetail(
+          errorMessage(error),
+          `${providerNames[id]} is not reachable at ${config.baseUrl}`
+        )
       }
     }
   }
@@ -792,10 +905,11 @@ export class ProviderManager {
   private async analyzeChatCompletions(
     input: AnalysisInput,
     settings: AppSettings,
-    id: 'mistral' | 'openai-compatible'
+    id: 'mistral' | 'openai-compatible' | 'lm-studio'
   ): Promise<void> {
     const config = settings.providers[id]
-    const key = await this.keyFor(id)
+    if (!config.model) throw new Error(`Choose a model for ${providerNames[id]} in Providers`)
+    const key = id === 'lm-studio' ? '' : await this.keyFor(id)
     const imageUrl =
       id === 'mistral'
         ? dataUrl(input.image)
@@ -813,15 +927,17 @@ export class ProviderManager {
           ]
         }
       ],
-      ...(id === 'openai-compatible'
+      ...(id === 'openai-compatible' || id === 'lm-studio'
         ? { stream_options: { include_usage: true } }
         : {})
     }
+    const baseUrl =
+      id === 'lm-studio' ? lmStudioApiBaseUrl(config.baseUrl) : config.baseUrl.replace(/\/+$/, '')
     const response = await requireOk(
-      await fetch(`${config.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+      await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
-          authorization: `Bearer ${key}`,
+          ...(key ? { authorization: `Bearer ${key}` } : {}),
           'content-type': 'application/json'
         },
         body: JSON.stringify(body),
@@ -837,6 +953,44 @@ export class ProviderManager {
         if (typeof delta === 'string' && delta) input.onEvent({ type: 'delta', text: delta })
         inputTokens = payload?.usage?.prompt_tokens ?? inputTokens
         outputTokens = payload?.usage?.completion_tokens ?? outputTokens
+      },
+      input.signal
+    )
+    input.onEvent(usageEvent(id, config.model, inputTokens, outputTokens))
+  }
+
+  private async analyzeOllama(input: AnalysisInput, settings: AppSettings): Promise<void> {
+    const id = 'ollama'
+    const config = settings.providers[id]
+    if (!config.model) throw new Error(`Choose a model for ${providerNames[id]} in Providers`)
+    const response = await requireOk(
+      await fetch(`${ollamaApiBaseUrl(config.baseUrl)}/api/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: config.model,
+          stream: true,
+          messages: [
+            ...input.metadata.conversation,
+            {
+              role: 'user',
+              content: buildPrompt(input.metadata),
+              images: [input.image.toString('base64')]
+            }
+          ]
+        }),
+        signal: input.signal
+      })
+    )
+    let inputTokens = 0
+    let outputTokens = 0
+    await readNdjson(
+      response,
+      (payload) => {
+        const delta = payload?.message?.content
+        if (typeof delta === 'string' && delta) input.onEvent({ type: 'delta', text: delta })
+        inputTokens = payload?.prompt_eval_count ?? inputTokens
+        outputTokens = payload?.eval_count ?? outputTokens
       },
       input.signal
     )
@@ -959,5 +1113,7 @@ export const providerInternals = {
   codexTurnOptions,
   parseClaudeOutput,
   resolveReasoningEffort,
-  safeDetail
+  safeDetail,
+  lmStudioApiBaseUrl,
+  ollamaApiBaseUrl
 }
