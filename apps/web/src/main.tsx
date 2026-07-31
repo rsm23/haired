@@ -38,7 +38,7 @@ import './styles.css'
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'rahmani@seifelmoulouk.com'
 const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || 'https://github.com/rsm23/haired'
 const X_URL = 'https://x.com/c_madangle'
-const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.1'
+const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.2'
 const RELEASE_NUMBER = RELEASE_VERSION.replace(/^v/, '')
 const RELEASE_REPOSITORY_URL =
   import.meta.env.VITE_RELEASE_REPOSITORY_URL || 'https://github.com/rsm23/haired'
@@ -127,7 +127,8 @@ const workflowSteps = [
   {
     number: '02',
     title: 'Choose how to solve it',
-    description: 'Get an instant solution or add your own question, constraints, and preferred answer depth.',
+    description:
+      'Get an instant solution, ask your own question, or turn on Interview Mode for a narrated reasoning-and-code walkthrough.',
     icon: Sparkles
   },
   {
@@ -152,9 +153,9 @@ const capabilityHighlights = [
     icon: Terminal
   },
   {
-    title: 'Understand the reasoning',
+    title: 'Practice with Interview Mode',
     description:
-      'Ask for a walkthrough, compare approaches, clarify a concept, or explore the trade-offs behind an implementation.',
+      'Alternate detailed technical reasoning with complete code sections, including the plan, trade-offs, edge cases, complexity, and validation.',
     icon: Sparkles
   },
   {
@@ -359,6 +360,7 @@ function SharePreview() {
 
 function Home() {
   const [mode, setMode] = useState<AnalysisMode>('fast')
+  const [interviewMode, setInterviewMode] = useState(true)
 
   return (
     <main>
@@ -537,6 +539,94 @@ function Home() {
                   : 'Deep checks assumptions and explains why the recommended approach is stronger than the alternatives.'}
               </p>
             </div>
+          </div>
+        </div>
+
+        <div className="interview-section" id="interview-mode">
+          <div className="interview-copy">
+            <span className="interview-kicker">
+              <Sparkles />
+              New in v0.1.2
+            </span>
+            <h3>
+              Reason. Code.
+              <br />
+              <em>Repeat.</em>
+            </h3>
+            <p>
+              Turn on Interview Mode when you want more than a finished answer. Haired asks your
+              provider to explain the problem, plan, implementation choices, trade-offs, edge
+              cases, complexity, and validation alongside the corresponding code.
+            </p>
+            <ToggleGroup
+              className="interview-toggle"
+              type="single"
+              variant="outline"
+              size="lg"
+              value={interviewMode ? 'interview' : 'direct'}
+              aria-label="Interview answer format"
+              onValueChange={(value) => {
+                if (value === 'direct' || value === 'interview') {
+                  setInterviewMode(value === 'interview')
+                }
+              }}
+            >
+              <ToggleGroupItem value="direct">Direct answer</ToggleGroupItem>
+              <ToggleGroupItem value="interview">
+                <Sparkles />
+                Interview Mode
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <small>
+              Opt in from Appearance &amp; behavior. Full reply stays selected so every explanation
+              remains visible.
+            </small>
+          </div>
+
+          <div className="interview-output" aria-live="polite">
+            <div className="interview-output-head">
+              <span>
+                <Braces />
+                answer.tsx
+              </span>
+              <b data-enabled={interviewMode}>{interviewMode ? 'Interview on' : 'Direct'}</b>
+            </div>
+            {interviewMode ? (
+              <div className="interview-output-body">
+                <div className="reasoning-step">
+                  <span>Reasoning 01</span>
+                  <p>
+                    Keep the selected task as the source of truth, then separate the interview
+                    explanation from each implementation step so the solution is easy to narrate.
+                  </p>
+                </div>
+                <pre>
+                  <code>{`const [interviewMode, setInterviewMode] = useState(false)\n\nconst answerStyle = interviewMode ? 'full-reply' : savedStyle`}</code>
+                </pre>
+                <div className="reasoning-step">
+                  <span>Reasoning 02</span>
+                  <p>
+                    Full reply prevents the code-only filter from hiding the walkthrough. The
+                    preference persists, but remains disabled by default for existing workflows.
+                  </p>
+                </div>
+                <pre>
+                  <code>{`if (interviewMode) {\n  requirements.push(INTERVIEW_MODE_INSTRUCTION)\n}`}</code>
+                </pre>
+                <div className="reasoning-review">
+                  <span>Final review</span>
+                  Complete code · edge cases · complexity · validation
+                </div>
+              </div>
+            ) : (
+              <div className="direct-output-body">
+                <span>Answer</span>
+                <h4>Enable the setting and append the matching response instruction.</h4>
+                <pre>
+                  <code>{`const answerStyle = interviewMode ? 'full-reply' : savedStyle`}</code>
+                </pre>
+              </div>
+            )}
           </div>
         </div>
       </section>
