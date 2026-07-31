@@ -37,6 +37,7 @@ import './styles.css'
 
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'rahmani@seifelmoulouk.com'
 const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || 'https://github.com/rsm23/haired'
+const X_URL = 'https://x.com/c_madangle'
 const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.1'
 const RELEASE_NUMBER = RELEASE_VERSION.replace(/^v/, '')
 const RELEASE_REPOSITORY_URL =
@@ -246,6 +247,14 @@ function Shell({ children, route }: { children: React.ReactNode; route: Route })
           <a href="#/privacy">Privacy</a>
           <a href="#/terms">Terms</a>
           <a href="#/help">Help</a>
+          <a
+            href={X_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Follow c_madangle on X (formerly Twitter)"
+          >
+            @c_madangle
+          </a>
         </div>
       </footer>
     </div>

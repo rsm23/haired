@@ -663,14 +663,3 @@ keys; arrows are added automatically.
 The protected desktop renderer requires Electron's preload bridge. Use
 `pnpm dev` for desktop behavior. `pnpm dev:web` serves the separate public
 website only.
-
-## Project status and licensing
-
-The workspace version is `0.1.1` and should be treated as pre-release software
-until the platform verification matrix in `docs/release-gates.md` has passed for
-the intended release artifacts.
-
-“Free app” describes the product's lack of a Haired subscription. This
-repository currently has no `LICENSE` file, so publishing the source does not
-automatically grant open-source reuse rights. Add an explicit license before
-presenting the repository as open source.
