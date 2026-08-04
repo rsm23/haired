@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
   Apple,
@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   ExternalLink,
+  GitFork,
   History,
   Laptop,
   LockKeyhole,
@@ -46,7 +47,35 @@ const RELEASE_DOWNLOAD_BASE_URL = `${RELEASE_REPOSITORY_URL}/releases/download/$
 const RELEASE_PAGE_URL = `${RELEASE_REPOSITORY_URL}/releases/tag/${RELEASE_VERSION}`
 const CHECKSUM_URL = `${RELEASE_DOWNLOAD_BASE_URL}/SHA256SUMS.txt`
 const DOWNLOAD_URL = '#downloads'
+const LOGO_URL = `${import.meta.env.BASE_URL}favicon.svg`
 const WORKSPACE_IMAGE_URL = `${import.meta.env.BASE_URL}assets/haired-workspace.jpg`
+const PROVIDERS_IMAGE_URL = `${import.meta.env.BASE_URL}assets/haired-providers.jpg`
+const APPEARANCE_IMAGE_URL = `${import.meta.env.BASE_URL}assets/haired-appearance.jpg`
+const SHORTCUTS_IMAGE_URL = `${import.meta.env.BASE_URL}assets/haired-shortcuts.jpg`
+const PRIVACY_IMAGE_URL = `${import.meta.env.BASE_URL}assets/haired-privacy.jpg`
+
+const screenshots = [
+  {
+    src: PROVIDERS_IMAGE_URL,
+    alt: 'Haired AI providers settings showing Codex, Claude, LM Studio, Ollama, and BYOK options',
+    caption: 'Bring your own provider'
+  },
+  {
+    src: APPEARANCE_IMAGE_URL,
+    alt: 'Haired appearance and behavior settings with themes, opacity, and answer style options',
+    caption: 'Tune the overlay'
+  },
+  {
+    src: SHORTCUTS_IMAGE_URL,
+    alt: 'Haired global shortcut settings for capture, ask, settings, and window movement',
+    caption: 'Keyboard-first control'
+  },
+  {
+    src: PRIVACY_IMAGE_URL,
+    alt: 'Haired privacy check with capture protection status and diagnostics',
+    caption: 'Verify before you share'
+  }
+]
 
 const downloadPackages = [
   {
@@ -115,6 +144,57 @@ const apiProviders: Provider[] = [
   { name: 'Gemini', logo: geminiLogo },
   { name: 'Mistral', logo: mistralLogo },
   { name: 'Compatible API' }
+]
+
+const marqueeProviders: Provider[] = [
+  { name: 'Codex CLI', logo: codexLogo },
+  { name: 'Claude Code', logo: claudeLogo },
+  { name: 'OpenAI', logo: openAiLogo, className: 'provider-logo-monochrome' },
+  { name: 'Anthropic', logo: anthropicLogo, className: 'provider-logo-monochrome' },
+  { name: 'Gemini', logo: geminiLogo },
+  { name: 'Mistral', logo: mistralLogo },
+  { name: 'LM Studio', logo: lmStudioLogo, className: 'provider-logo-monochrome' },
+  { name: 'Ollama', logo: ollamaLogo, className: 'provider-logo-monochrome' }
+]
+
+const heroStats = [
+  {
+    value: 9,
+    prefix: '',
+    suffix: '',
+    label: 'AI providers',
+    detail: 'CLI agents, local runtimes, and your own API keys'
+  },
+  {
+    value: 0,
+    prefix: '$',
+    suffix: '',
+    label: 'per month',
+    detail: 'No Haired plan—bring the subscription you already pay for'
+  },
+  {
+    value: 0,
+    prefix: '',
+    suffix: '',
+    label: 'accounts required',
+    detail: 'No sign-up, no hosted proxy, no usage credits'
+  },
+  {
+    value: 100,
+    prefix: '',
+    suffix: '%',
+    label: 'open source',
+    detail: 'MIT licensed and built to be forked'
+  }
+]
+
+type TerminalLine = { prompt?: string; text: string; instant?: boolean }
+
+const forkTerminalLines: TerminalLine[] = [
+  { prompt: '~/code', text: 'git clone https://github.com/rsm23/haired.git' },
+  { text: '✓ Cloned haired', instant: true },
+  { prompt: '~/code/haired', text: 'pnpm install && pnpm dev' },
+  { text: '▲ Haired overlay running — yours to reshape', instant: true }
 ]
 
 const workflowSteps = [
@@ -187,10 +267,7 @@ function Logo() {
   return (
     <a className="logo" href="./" aria-label="Haired home">
       <span className="logo-mark" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
+        <img src={LOGO_URL} alt="" width="24" height="24" />
       </span>
       HAIRED
     </a>
@@ -206,6 +283,213 @@ function ProviderMark({ provider }: { provider: Provider }) {
         <Braces />
       )}
     </span>
+  )
+}
+
+function CountUp({ value, prefix = '', suffix = '' }: { value: number; prefix?: string; suffix?: string }) {
+  const numberRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    const element = numberRef.current
+    if (!element) return
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      element.textContent = String(value)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return
+        observer.disconnect()
+        const duration = 1300
+        const start = performance.now()
+        const tick = (now: number) => {
+          const progress = Math.min((now - start) / duration, 1)
+          element.textContent = String(Math.round(value * (1 - Math.pow(1 - progress, 3))))
+          if (progress < 1) requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      },
+      { threshold: 0.6 }
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [value])
+
+  return (
+    <span className="stat-number">
+      {prefix}
+      <span ref={numberRef}>0</span>
+      {suffix}
+    </span>
+  )
+}
+
+function StatsBand() {
+  return (
+    <section className="stats-band section-grid" aria-label="Haired by the numbers">
+      <ul>
+        {heroStats.map((stat, index) => (
+          <li key={stat.label} data-reveal style={{ transitionDelay: `${index * 90}ms` }}>
+            <CountUp value={stat.value} prefix={stat.prefix} suffix={stat.suffix} />
+            <strong>{stat.label}</strong>
+            <span className="stat-detail">{stat.detail}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function ProviderMarquee() {
+  return (
+    <section className="logo-marquee" aria-label="Supported AI providers and runtimes">
+      <p>Works with the AI stack you already pay for</p>
+      <div className="marquee">
+        {[0, 1].map((copy) => (
+          <ul key={copy} aria-hidden={copy === 1 || undefined}>
+            {marqueeProviders.map((provider) => (
+              <li key={provider.name}>
+                <ProviderMark provider={provider} />
+                {provider.name}
+              </li>
+            ))}
+          </ul>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function TypingTerminal({ lines }: { lines: TerminalLine[] }) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [started, setStarted] = useState(false)
+  const [progress, setProgress] = useState({ line: 0, char: 0 })
+
+  useEffect(() => {
+    const element = frameRef.current
+    if (!element) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setStarted(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.35 }
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!started) return
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setProgress({ line: lines.length, char: 0 })
+      return
+    }
+
+    let line = 0
+    let char = 0
+    let timer = 0
+
+    const step = () => {
+      const current = lines[line]
+      if (!current) return
+      if (current.instant || char >= current.text.length) {
+        line += 1
+        char = 0
+        setProgress({ line, char })
+        timer = window.setTimeout(step, current.instant ? 520 : 700)
+      } else {
+        char += 1
+        setProgress({ line, char })
+        timer = window.setTimeout(step, 24 + Math.random() * 44)
+      }
+    }
+
+    timer = window.setTimeout(step, 400)
+    return () => window.clearTimeout(timer)
+  }, [started, lines])
+
+  return (
+    <div
+      className="oss-terminal"
+      ref={frameRef}
+      role="img"
+      aria-label="Terminal cloning the Haired repository and starting the development build"
+    >
+      <div className="oss-terminal-bar" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <i>haired — zsh</i>
+      </div>
+      <pre aria-hidden="true">
+        {lines.map((line, index) => {
+          if (index > progress.line) return null
+          const isCurrent = index === progress.line
+          const text = isCurrent && !line.instant ? line.text.slice(0, progress.char) : line.text
+          return (
+            <span className="terminal-line" data-kind={line.prompt ? 'command' : 'output'} key={index}>
+              {line.prompt ? <span className="terminal-prompt">{line.prompt} $ </span> : null}
+              {text}
+              {isCurrent && !line.instant ? <span className="terminal-cursor" /> : null}
+            </span>
+          )
+        })}
+        {progress.line >= lines.length ? (
+          <span className="terminal-line" data-kind="command">
+            <span className="terminal-prompt">~/code/haired $ </span>
+            <span className="terminal-cursor" />
+          </span>
+        ) : null}
+      </pre>
+    </div>
+  )
+}
+
+function OpenSourceSection() {
+  return (
+    <section className="oss-section section-grid" aria-labelledby="oss-title">
+      <div className="oss-copy" data-reveal>
+        <span className="page-label">MIT licensed</span>
+        <h2 id="oss-title">
+          Don't like something?
+          <br />
+          <em>Fork it.</em>
+        </h2>
+        <ul>
+          <li>
+            <strong>Restyle every surface.</strong> Overlay, themes, shortcuts—make it match your
+            taste.
+          </li>
+          <li>
+            <strong>Wire in your own provider.</strong> Add a runtime, a model, or a whole new
+            flow.
+          </li>
+          <li>
+            <strong>Ship your own build.</strong> Self-host it or distribute it as your own.
+          </li>
+        </ul>
+        <div className="oss-links">
+          <Button asChild variant="outline">
+            <a href={`${GITHUB_URL}/fork`} target="_blank" rel="noreferrer">
+              <GitFork data-icon="inline-start" />
+              Fork on GitHub
+            </a>
+          </Button>
+          <a className="text-link" href={GITHUB_URL} target="_blank" rel="noreferrer">
+            Browse the source
+            <ArrowRight />
+          </a>
+        </div>
+      </div>
+
+      <TypingTerminal lines={forkTerminalLines} />
+    </section>
   )
 }
 
@@ -242,7 +526,7 @@ function Shell({ children, route }: { children: React.ReactNode; route: Route })
 
       <footer>
         <Logo />
-        <p>Free, keyboard-first screen intelligence.</p>
+        <p>Free, open-source stealth pair-programming and interview AI assistant.</p>
         <div>
           <a href={RELEASE_REPOSITORY_URL} target="_blank" rel="noreferrer">Releases</a>
           <a href="#/privacy">Privacy</a>
@@ -266,6 +550,7 @@ function SharePreview() {
   return (
     <figure
       className="share-demo"
+      data-reveal
       aria-label="Haired appears on your desktop while a supported Windows meeting share receives the workspace without the Haired window"
     >
       <div className="share-demo-meta">
@@ -298,10 +583,7 @@ function SharePreview() {
             <aside className="private-answer">
               <span className="answer-brand">
                 <span className="logo-mark" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
+                  <img src={LOGO_URL} alt="" width="24" height="24" />
                 </span>
                 HAIRED
               </span>
@@ -358,6 +640,62 @@ function SharePreview() {
   )
 }
 
+function ScreenshotGallery() {
+  const [active, setActive] = useState(0)
+
+  return (
+    <section className="screenshots-section section-grid" aria-labelledby="screenshots-title">
+      <div className="section-heading" data-reveal>
+        <span className="page-label">Built for focus</span>
+        <h2 id="screenshots-title">
+          See how it works.
+          <br />
+          <em>Inside your workflow.</em>
+        </h2>
+        <p>
+          Configure once, then capture and solve without leaving the app you're already in.
+        </p>
+      </div>
+
+      <div className="screenshot-gallery" data-reveal>
+        <div className="screenshot-stage">
+          {screenshots.map((shot, index) => (
+            <img
+              key={shot.src}
+              src={shot.src}
+              alt={shot.alt}
+              className={active === index ? 'screenshot-active' : ''}
+              loading={index === 0 ? 'eager' : 'lazy'}
+              width="1280"
+              height="800"
+            />
+          ))}
+          <span className="screenshot-caption" aria-live="polite">
+            {screenshots[active]?.caption}
+          </span>
+        </div>
+
+        <div className="screenshot-thumbs" role="tablist" aria-label="Screenshot gallery">
+          {screenshots.map((shot, index) => (
+            <button
+              key={shot.src}
+              type="button"
+              role="tab"
+              aria-selected={active === index}
+              aria-label={`View ${shot.caption}`}
+              className={active === index ? 'thumb-active' : ''}
+              onClick={() => setActive(index)}
+            >
+              <img src={shot.src} alt="" width="200" height="125" />
+              <span>{shot.caption}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Home() {
   const [mode, setMode] = useState<AnalysisMode>('fast')
   const [interviewMode, setInterviewMode] = useState(true)
@@ -365,22 +703,25 @@ function Home() {
   return (
     <main>
       <section className="hero-section">
-        <div className="hero-ambient" aria-hidden="true" />
+        <div className="hero-aurora" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </div>
         <div className="hero-layout">
-          <div className="hero-copy">
+          <div className="hero-copy" data-reveal>
             <span className="hero-kicker">
               <ShieldCheck />
-              Technical interview & coding copilot
+              Stealth pair programming & interview AI assistant
             </span>
             <h1>
               Get unstuck. <em>Get better.</em>
               <span>Get closer to hired.</span>
             </h1>
             <p>
-              Haired helps you prepare for technical interviews and solve real coding problems
-              without breaking your flow. Select a question, error, code sample, or diagram on
-              your screen, then get a direct solution, complete code, or a deeper explanation from
-              the AI provider you choose.
+              Haired is a stealth pair-programming and interview AI assistant. Select a question,
+              error, code sample, or diagram on your screen, then get a direct solution, complete
+              code, or a deeper explanation from the AI provider you choose—without breaking your flow.
             </p>
 
             <div className="hero-actions">
@@ -395,6 +736,10 @@ function Home() {
                 <ArrowRight />
               </a>
             </div>
+
+            <p className="hero-note">
+              Free and open source. No account, no hosted proxy, no usage credits.
+            </p>
 
             <p className="hero-caveat">
               <strong>Screen-sharing privacy:</strong> Windows 10/11 can request OS-level exclusion
@@ -413,11 +758,13 @@ function Home() {
         </div>
       </section>
 
+      <ProviderMarquee />
+
       <section className="trust-rail" aria-label="Screen-sharing privacy boundary">
         <div>
           <Braces />
-          <strong>Prepare for the questions that get you hired</strong>
-          <span>Practice algorithms, debugging, system design, code review, and technical explanations.</span>
+          <strong>Stealth pair programming for interview prep</strong>
+          <span>Practice algorithms, debugging, system design, code review, and technical explanations without leaving your workflow.</span>
         </div>
         <div>
           <MonitorOff />
@@ -426,8 +773,10 @@ function Home() {
         </div>
       </section>
 
+      <StatsBand />
+
       <section className="capabilities-section section-grid" aria-labelledby="capabilities-title">
-        <div className="section-heading">
+        <div className="section-heading" data-reveal>
           <h2 id="capabilities-title">
             Build the skills.
             <br />
@@ -441,10 +790,10 @@ function Home() {
         </div>
 
         <div className="capability-grid">
-          {capabilityHighlights.map((capability) => {
+          {capabilityHighlights.map((capability, index) => {
             const Icon = capability.icon
             return (
-              <article key={capability.title}>
+              <article key={capability.title} data-reveal style={{ transitionDelay: `${index * 70}ms` }}>
                 <Icon />
                 <h3>{capability.title}</h3>
                 <p>{capability.description}</p>
@@ -455,7 +804,7 @@ function Home() {
       </section>
 
       <section className="workflow-section section-grid" id="product">
-        <div className="section-heading">
+        <div className="section-heading" data-reveal>
           <h2>
             See it. Ask it.
             <br />
@@ -468,10 +817,10 @@ function Home() {
         </div>
 
         <ol className="workflow-rail">
-          {workflowSteps.map((step) => {
+          {workflowSteps.map((step, index) => {
             const Icon = step.icon
             return (
-              <li key={step.number}>
+              <li key={step.number} data-reveal style={{ transitionDelay: `${index * 110}ms` }}>
                 <span className="workflow-node">
                   <Icon />
                 </span>
@@ -485,7 +834,7 @@ function Home() {
           })}
         </ol>
 
-        <div className="mode-section">
+        <div className="mode-section" data-reveal>
           <div className="mode-copy">
             <h3>
               <em>{mode === 'fast' ? 'Fast' : 'Deep'}</em>{' '}
@@ -542,7 +891,7 @@ function Home() {
           </div>
         </div>
 
-        <div className="interview-section" id="interview-mode">
+        <div className="interview-section" id="interview-mode" data-reveal>
           <div className="interview-copy">
             <span className="interview-kicker">
               <Sparkles />
@@ -631,8 +980,10 @@ function Home() {
         </div>
       </section>
 
+      <ScreenshotGallery />
+
       <section className="providers-section section-grid" id="providers">
-        <div className="section-heading">
+        <div className="section-heading" data-reveal>
           <h2>
             Your models. Your accounts.
             <br />
@@ -645,7 +996,7 @@ function Home() {
           </p>
         </div>
 
-        <div className="provider-groups">
+        <div className="provider-groups" data-reveal>
           <div className="provider-group cli-group">
             <div className="provider-group-title">
               <span>Use your CLI</span>
@@ -698,7 +1049,7 @@ function Home() {
           </div>
         </div>
 
-        <div className="privacy-band">
+        <div className="privacy-band" data-reveal>
           <div>
             <LockKeyhole />
             <span>
@@ -723,8 +1074,10 @@ function Home() {
         </div>
       </section>
 
+      <OpenSourceSection />
+
       <section className="downloads-section section-grid" id="downloads" aria-labelledby="downloads-title">
-        <div className="downloads-heading">
+        <div className="downloads-heading" data-reveal>
           <div>
             <span className="page-label">Desktop preview · {RELEASE_VERSION}</span>
             <h2 id="downloads-title">
@@ -739,7 +1092,7 @@ function Home() {
           </p>
         </div>
 
-        <div className="download-grid">
+        <div className="download-grid" data-reveal>
           {downloadPackages.map((downloadPackage) => {
             const Icon = downloadPackage.icon
             return (
@@ -783,7 +1136,7 @@ function Home() {
         </div>
       </section>
 
-      <section className="final-cta section-grid">
+      <section className="final-cta section-grid" data-reveal>
         <MousePointer2 aria-hidden="true" />
         <h2>
           Practice sharper. Solve faster. <em>Walk in ready.</em>
@@ -913,6 +1266,26 @@ function App() {
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
+
+  useEffect(() => {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'))
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-revealed')
+            observer.unobserve(entry.target)
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -48px 0px' }
+    )
+
+    elements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [route])
 
   let content: React.ReactNode
   if (route === 'privacy') content = <Legal kind="privacy" />

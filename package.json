@@ -3,7 +3,7 @@
   "version": "0.1.2",
   "private": true,
   "license": "MIT",
-  "description": "Secure cross-platform AI screen assistant",
+  "description": "Free, open-source stealth pair-programming and interview AI assistant for macOS and Windows.",
   "packageManager": "pnpm@11.10.0",
   "engines": {
     "node": ">=22.12.0"
