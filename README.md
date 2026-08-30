@@ -7,7 +7,7 @@ A free, open-source **stealth pair-programming and interview AI assistant** for 
 </p>
 
 <p align="center">
-  <a href="https://github.com/rsm23/haired/releases/latest">Download</a> ·
+  <a href="https://haired.seifelmoulouk.com/#downloads">Download</a> ·
   <a href="https://rsm23.github.io/haired/">Website</a> ·
   <a href="#features">Features</a> ·
   <a href="#providers">Providers</a>
@@ -77,7 +77,8 @@ API keys are encrypted with the OS secure storage (macOS Keychain / Windows DPAP
 
 ## Quick start
 
-1. **Install Haired** from the [latest release](https://github.com/rsm23/haired/releases/latest).
+1. **Install Haired** from the [download page](https://haired.seifelmoulouk.com/#downloads):
+   macOS v0.1.3 for Apple silicon or Intel, or Windows 10/11 x64 v0.1.2.
 2. **Pick a provider** in Settings → AI providers:
    - Run `codex login` or `claude auth login` for CLI providers.
    - Start LM Studio's local server or `ollama serve` for local models.
