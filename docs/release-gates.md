@@ -2,6 +2,25 @@
 
 Production desktop releases remain drafts until all automated build jobs and the native verification matrix pass.
 
+## macOS signing and notarization
+
+Production macOS packages must use `apps/desktop/electron-builder.yml`. Preview
+configuration is never acceptable for a public macOS release.
+
+Before publication, verify both Apple Silicon and Intel packages:
+
+- The app is signed by the Haired Developer ID Application identity with hardened runtime.
+- `codesign --verify --deep --strict` succeeds for the app in the build directory and inside each DMG.
+- Apple notarization returns `Accepted` for the app and each final DMG.
+- `stapler validate` succeeds for the app and each DMG.
+- Gatekeeper accepts the app and each DMG with the primary-signature context.
+- The mounted DMG contains the committed icon and a valid signed, stapled app.
+
+The release workflow expects `MACOS_CERTIFICATE_BASE64`,
+`MACOS_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8_BASE64`,
+`APPLE_API_KEY_ID`, and `APPLE_API_ISSUER` as GitHub Actions secrets. Never
+commit certificates, private keys, passwords, or notarization credentials.
+
 ## Windows capture matrix
 
 Run on Windows 10 22H2 and the current supported Windows 11 release. Verify with a second participant and a recording, using both a full-display share and the applicable window/tab share:

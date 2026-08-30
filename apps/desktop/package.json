@@ -1,6 +1,6 @@
 {
   "name": "@haired/desktop",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "Stealth pair-programming and interview AI assistant for macOS and Windows.",
