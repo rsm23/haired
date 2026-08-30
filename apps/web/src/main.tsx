@@ -4,7 +4,6 @@ import {
   Apple,
   ArrowRight,
   Braces,
-  CircleAlert,
   Download,
   Eye,
   ExternalLink,
@@ -12,7 +11,6 @@ import {
   History,
   Laptop,
   LockKeyhole,
-  MonitorDown,
   MonitorOff,
   MousePointer2,
   ScanSearch,
@@ -39,7 +37,7 @@ import './styles.css'
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'rahmani@seifelmoulouk.com'
 const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || 'https://github.com/rsm23/haired'
 const X_URL = 'https://x.com/c_madangle'
-const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.2'
+const RELEASE_VERSION = import.meta.env.VITE_RELEASE_VERSION || 'v0.1.3'
 const RELEASE_NUMBER = RELEASE_VERSION.replace(/^v/, '')
 const RELEASE_REPOSITORY_URL =
   import.meta.env.VITE_RELEASE_REPOSITORY_URL || 'https://github.com/rsm23/haired'
@@ -78,14 +76,6 @@ const screenshots = [
 ]
 
 const downloadPackages = [
-  {
-    platform: 'Windows 10 / 11',
-    architecture: '64-bit Intel or AMD',
-    format: 'NSIS installer · .exe',
-    fileName: `Haired-${RELEASE_NUMBER}-win-x64.exe`,
-    url: `${RELEASE_DOWNLOAD_BASE_URL}/Haired-${RELEASE_NUMBER}-win-x64.exe`,
-    icon: MonitorDown
-  },
   {
     platform: 'macOS',
     architecture: 'Apple silicon',
@@ -528,7 +518,7 @@ function Shell({ children, route }: { children: React.ReactNode; route: Route })
         <Logo />
         <p>Free, open-source stealth pair-programming and interview AI assistant.</p>
         <div>
-          <a href={RELEASE_REPOSITORY_URL} target="_blank" rel="noreferrer">Releases</a>
+          <a href={RELEASE_PAGE_URL} target="_blank" rel="noreferrer">Releases</a>
           <a href="#/privacy">Privacy</a>
           <a href="#/terms">Terms</a>
           <a href="#/help">Help</a>
@@ -1079,7 +1069,7 @@ function Home() {
       <section className="downloads-section section-grid" id="downloads" aria-labelledby="downloads-title">
         <div className="downloads-heading" data-reveal>
           <div>
-            <span className="page-label">Desktop preview · {RELEASE_VERSION}</span>
+            <span className="page-label">Signed macOS release · {RELEASE_VERSION}</span>
             <h2 id="downloads-title">
               Download Haired.
               <br />
@@ -1087,8 +1077,8 @@ function Home() {
             </h2>
           </div>
           <p>
-            Native packages for Windows and both current Mac architectures. Every button points
-            directly to the matching GitHub-hosted release asset.
+            Apple Developer signed and notarized packages for Apple silicon and Intel Macs. Every
+            button points directly to the matching GitHub-hosted release asset.
           </p>
         </div>
 
@@ -1119,10 +1109,11 @@ function Home() {
 
         <div className="download-release-meta">
           <div className="preview-notice">
-            <CircleAlert aria-hidden="true" />
+            <ShieldCheck aria-hidden="true" />
             <p>
-              <strong>Unsigned preview build.</strong> Windows SmartScreen or macOS Gatekeeper may
-              show a warning. Verify the SHA-256 checksum before opening the installer.
+              <strong>Signed and notarized by Apple.</strong> Each app and disk image carries a
+              Developer ID signature and a stapled notarization ticket. You can also verify the
+              published SHA-256 checksum before opening it.
             </p>
           </div>
           <div className="release-links">

@@ -92,7 +92,11 @@ API keys are encrypted with the OS secure storage (macOS Keychain / Windows DPAP
 | Open settings | `Cmd/Ctrl+Shift+H` |
 | Move answer window | Hold `Cmd/Ctrl+Alt` + arrow keys |
 
-> Preview builds are unsigned: Windows SmartScreen and macOS Gatekeeper may show a warning. Verify the SHA-256 checksums on the release page before installing.
+> [!NOTE]
+> The macOS v0.1.3 packages are signed with an Apple Developer ID certificate,
+> notarized by Apple, and distributed with stapled notarization tickets. Choose
+> the Apple silicon or Intel DMG on the release page and optionally verify its
+> published SHA-256 checksum before installing.
 
 ## License
 
