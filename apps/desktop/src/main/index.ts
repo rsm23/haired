@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import {
   app,
@@ -29,9 +29,11 @@ import {
 } from '@haired/contracts'
 import {
   captureDisplayAtPointer,
+  constrainedSize,
   cropCapture,
   type CapturedDisplay
 } from './capture'
+import { BrowserTabBridge, type TabCapture } from './browser-tab-bridge'
 import { HistoryVault } from './history'
 import { isTrustedRendererUrl } from './ipc-trust'
 import {
@@ -107,10 +109,16 @@ let busyOperations = 0
 let settingsStore: SettingsStore
 let historyVault: HistoryVault
 let providerManager: ProviderManager
+let browserTabBridge: BrowserTabBridge | null = null
+let browserTabToken = ''
+let browserTabConnectionError = ''
+let tabSelectionWindow: BrowserWindow | null = null
+let tabSelectionGeneration = 0
 const overlays = new Map<string, OverlaySession>()
 let shortcutState: ShortcutState = {
   instant: false,
   ask: false,
+  browserTab: false,
   settings: false,
   moveOverlay: false
 }
@@ -235,6 +243,7 @@ function closeCaptureSession(): void {
 async function startCapture(mode: CaptureMode): Promise<void> {
   if (captureStarting) return
   captureStarting = true
+  cancelBrowserTabSelection()
   closeCaptureSession()
   try {
     const capture = await captureDisplayAtPointer()
@@ -256,6 +265,68 @@ async function startCapture(mode: CaptureMode): Promise<void> {
   } finally {
     captureStarting = false
   }
+}
+
+function closeTabSelectionWindow(): void {
+  const window = tabSelectionWindow
+  tabSelectionWindow = null
+  if (window && !window.isDestroyed()) window.destroy()
+}
+
+function cancelBrowserTabSelection(): void {
+  tabSelectionGeneration += 1
+  browserTabBridge?.cancel()
+  closeTabSelectionWindow()
+}
+
+async function selectBrowserTab(): Promise<void> {
+  if (!browserTabBridge) throw new Error(browserTabConnectionError || 'Browser tab capture is unavailable.')
+  closeCaptureSession()
+  cancelBrowserTabSelection()
+  const generation = tabSelectionGeneration
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const area = display.workArea
+  const window = createProtectedWindow({
+    kind: 'tab-selector', preload: preloadPath(),
+    bounds: { x: area.x, y: area.y, width: 1, height: 1 }
+  })
+  tabSelectionWindow = window
+  window.setTitle('Haired Tab Selection')
+  const settings = await settingsStore.load()
+  try {
+    await loadRenderer(window, { kind: 'tab-selector', theme: settings.themeColor })
+  } catch (error) {
+    if (generation !== tabSelectionGeneration || window.isDestroyed()) return
+    throw error
+  }
+  if (generation !== tabSelectionGeneration || window.isDestroyed()) return
+  browserTabBridge.arm()
+  if (!window.isDestroyed()) {
+    // Clicking an already active Chrome tab emits no onActivated event. Giving
+    // this transparent focus window lets the companion observe the user's click
+    // back into the browser via windows.onFocusChanged instead.
+    window.show()
+    window.focus()
+  }
+}
+
+async function answerBrowserTab(capture: TabCapture): Promise<void> {
+  const settings = await settingsStore.load()
+  let image = nativeImage.createFromBuffer(capture.image)
+  if (image.isEmpty()) throw new Error('The browser returned an empty image.')
+  const size = image.getSize()
+  image = image.resize({ ...constrainedSize(size.width, size.height), quality: 'best' })
+  const png = image.toPNG()
+  if (png.length > 10 * 1024 * 1024) throw new Error('The captured tab is too large.')
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const overlay = await createOverlay({
+    capture: { display, image },
+    region: { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height },
+    image: png, question: settings.defaultInstruction, mode: settings.defaultMode,
+    codeResponseStyle: settings.interviewMode ? 'full-reply' : settings.codeResponseStyle,
+    interviewMode: settings.interviewMode, interaction: 'instant'
+  })
+  void streamOverlay(overlay)
 }
 
 async function openScreenRecordingSettings(): Promise<void> {
@@ -620,11 +691,19 @@ function registerShortcuts(settings: AppSettings): ShortcutState {
   const entries: Array<[Exclude<ShortcutId, 'moveOverlay'>, string, () => void]> = [
     ['instant', settings.shortcuts.instant, () => startCaptureFromShortcut('instant')],
     ['ask', settings.shortcuts.ask, () => startCaptureFromShortcut('ask')],
+    ['browserTab', settings.shortcuts.browserTab, () => {
+      void selectBrowserTab().catch(async (error) => {
+        cancelBrowserTabSelection()
+        await showSettings('shortcuts')
+        await dialog.showMessageBox({ type: 'info', title: 'Browser tab capture', message: error instanceof Error ? error.message : 'Unable to select a browser tab.' })
+      })
+    }],
     ['settings', settings.shortcuts.settings, () => void showSettings()]
   ]
   shortcutState = {
     instant: false,
     ask: false,
+    browserTab: false,
     settings: false,
     moveOverlay: false
   }
@@ -756,6 +835,16 @@ function registerIpc(): void {
   handle('capture:complete', (_event, input) => completeSelection(input))
   handle('capture:cancel', () => closeCaptureSession())
   handle('capture:start', (_event, mode) => startCapture(mode === 'ask' ? 'ask' : 'instant'))
+  handle('browser-tab:status', () => ({ connected: browserTabBridge?.connected ?? false, error: browserTabConnectionError }))
+  handle('browser-tab:copy-pairing-code', (event) => {
+    if (new URL(event.sender.getURL()).searchParams.get('kind') !== 'settings') throw new Error('Open Settings to pair the extension.')
+    if (!browserTabToken || !browserTabBridge) throw new Error(browserTabConnectionError || 'Tab capture is unavailable.')
+    clipboard.writeText(browserTabToken)
+    return true
+  })
+  handle('browser-tab:open-extension', () => shell.openPath(app.isPackaged ? path.join(process.resourcesPath, 'browser-extension') : path.join(app.getAppPath(), 'browser-extension')))
+  handle('browser-tab:select', () => selectBrowserTab())
+  handle('browser-tab:cancel', () => cancelBrowserTabSelection())
   handle('history:list', (_event, search) =>
     historyVault.list(typeof search === 'string' ? search : '')
   )
@@ -943,6 +1032,21 @@ app.whenReady().then(async () => {
     new ProtectedFile(path.join(userData, 'provider-secrets.bin'))
   )
   await historyVault.initialize()
+  try {
+    const pairing = new ProtectedFile<{ token: string }>(path.join(userData, 'browser-tab-pairing.bin'))
+    const stored = await pairing.read()
+    browserTabToken = stored && /^[a-f0-9]{64}$/.test(stored.token) ? stored.token : randomBytes(32).toString('hex')
+    if (!stored || stored.token !== browserTabToken) await pairing.write({ token: browserTabToken })
+    browserTabBridge = new BrowserTabBridge(browserTabToken, answerBrowserTab, (error) => {
+      closeTabSelectionWindow()
+      if (error) console.warn(`Browser tab capture: ${error}`)
+    })
+    await browserTabBridge.start()
+  } catch (error) {
+    browserTabConnectionError = error instanceof Error ? error.message : 'Browser tab capture could not start.'
+    if (browserTabBridge) await browserTabBridge.stop().catch(() => undefined)
+    browserTabBridge = null
+  }
   registerIpc()
   const settings = await settingsStore.load()
   historyVault.pruneOlderThan(settings.historyAutoDeleteDays)
@@ -962,6 +1066,7 @@ app.on('will-quit', () => {
   quitting = true
   stopOverlayMovementRepeat()
   globalShortcut.unregisterAll()
+  void browserTabBridge?.stop()
   for (const overlay of overlays.values()) overlay.controller?.abort()
   historyVault?.close()
 })

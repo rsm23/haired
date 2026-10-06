@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Haired Tab Capture",
+  "version": "0.1.0",
+  "description": "Capture the browser tab you select after pressing Haired's tab shortcut.",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "alarms", "tabs"],
+  "host_permissions": ["http://127.0.0.1:43187/*"],
+  "optional_host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Capture selected tab or connect Haired" },
+  "options_page": "options.html"
+}

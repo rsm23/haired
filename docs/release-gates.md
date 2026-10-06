@@ -47,4 +47,30 @@ Verify screen-recording onboarding and denial, permission changes that require r
   encrypted key save/replace/removal, and model switching.
 - Confirm no restart occurs during capture, streaming, export, or a history write.
 
+## Browser tab capture gates
+
+For releases containing [browser tab capture](browser-tab-capture.md), verify
+Chrome and Edge on each supported desktop platform:
+
+- Production and preview packages include the complete `browser-extension`
+  resource folder, and **Open extension folder** opens it successfully.
+- Load the unpacked extension, pair it from Settings → Shortcuts, accept its
+  optional capture permission, and confirm **Extension connected**.
+- Capture an already active tab and a different tab using the desktop shortcut;
+  confirm only the visible page viewport reaches the normal answer/history flow.
+- Verify the default instruction, answer mode, Interview Mode, and custom
+  shortcuts with the tab workflow. Check that older custom bindings survive an
+  upgrade.
+- Verify Escape cancellation, silent 30-second expiry, replacement by a new
+  selection, cancellation by region capture, unsupported pages, tab switching
+  during capture, and disconnect/reconnect behavior.
+- Confirm capture fails without pairing or after its request expires. Repeat
+  the applicable sharing/recording matrix with tab selection and its answer
+  overlay; include extension badges and browser focus changes in observations.
+- On macOS, launch from Finder and verify Codex/Claude CLI detection from the
+  documented user installation folders and from an explicit executable path.
+
+Bridge tests and extension syntax checks supplement these native checks; they
+do not establish browser installation or end-to-end capture success.
+
 The in-app Privacy Check is diagnostic evidence only and does not replace this matrix.

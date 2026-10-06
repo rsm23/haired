@@ -10,6 +10,11 @@ function subscribe(channel: string, listener: (payload: unknown) => void): Unsub
 }
 
 const api = {
+  getBrowserTabStatus: (): Result<unknown> => ipcRenderer.invoke('browser-tab:status'),
+  copyBrowserTabPairingCode: (): Result<unknown> => ipcRenderer.invoke('browser-tab:copy-pairing-code'),
+  openBrowserExtension: (): Result<unknown> => ipcRenderer.invoke('browser-tab:open-extension'),
+  selectBrowserTab: (): Result<unknown> => ipcRenderer.invoke('browser-tab:select'),
+  cancelBrowserTabSelection: (): Result<unknown> => ipcRenderer.invoke('browser-tab:cancel'),
   getBootstrap: (): Result<unknown> => ipcRenderer.invoke('app:bootstrap'),
   quit: (): Result<unknown> => ipcRenderer.invoke('app:quit'),
   updateSettings: (patch: unknown): Result<unknown> =>

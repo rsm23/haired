@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import readline from 'node:readline'
+import { cliEnvironment, resolveCliExecutable } from './cli-path'
 import type {
   AnalysisMode,
   AnalysisMetadata,
@@ -189,10 +190,11 @@ async function commandResult(
   options: { signal?: AbortSignal; stdin?: string; timeoutMs?: number } = {}
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, args, {
+    const environment = cliEnvironment()
+    const child = spawn(resolveCliExecutable(binary, environment), args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      env: process.env
+      env: environment
     })
     let stdout = ''
     let stderr = ''
@@ -246,10 +248,10 @@ class CodexRpc {
   private stderr = ''
 
   constructor(binary: string, signal?: AbortSignal) {
-    this.child = spawn(binary, ['app-server'], {
+    this.child = spawn(resolveCliExecutable(binary), ['app-server'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      env: process.env
+      env: cliEnvironment()
     })
     readline.createInterface({ input: this.child.stdout }).on('line', (line) => {
       let message: RpcMessage

@@ -11,6 +11,12 @@ import {
 import { migrateBuiltInInstruction, SettingsStore } from './settings-store'
 
 describe('settings migration', () => {
+  it('adds tab capture to older shortcuts without replacing customized bindings', () => {
+    const settings = appSettingsSchema.parse({ shortcuts: { instant: 'CommandOrControl+Shift+I', ask: 'CommandOrControl+Shift+A' } })
+    expect(settings.shortcuts.browserTab).toBe('CommandOrControl+Alt+Shift+T')
+    expect(settings.shortcuts.instant).toBe('CommandOrControl+Shift+I')
+    expect(settings.shortcuts.ask).toBe('CommandOrControl+Shift+A')
+  })
   it.each([LEGACY_DEFAULT_INSTRUCTION, PREVIOUS_DEFAULT_INSTRUCTION])(
     'expands a previous built-in instruction',
     (defaultInstruction) => {

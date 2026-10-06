@@ -28,6 +28,11 @@ type IpcResult<T> = Promise<{ ok: true; data: T } | { ok: false; error: string }
 type Unsubscribe = () => void
 
 export interface HairedApi {
+  getBrowserTabStatus(): IpcResult<{ connected: boolean; error: string }>
+  copyBrowserTabPairingCode(): IpcResult<boolean>
+  openBrowserExtension(): IpcResult<string>
+  selectBrowserTab(): IpcResult<unknown>
+  cancelBrowserTabSelection(): IpcResult<unknown>
   getBootstrap(): IpcResult<BootstrapData>
   quit(): IpcResult<unknown>
   updateSettings(patch: Partial<AppSettings>): IpcResult<{

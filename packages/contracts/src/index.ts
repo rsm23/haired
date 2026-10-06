@@ -284,6 +284,7 @@ export const appSettingsSchema = z.object({
     .object({
       instant: z.string().default('CommandOrControl+Shift+Space'),
       ask: z.string().default('CommandOrControl+Shift+Enter'),
+      browserTab: z.string().default('CommandOrControl+Alt+Shift+T'),
       settings: z.string().default('CommandOrControl+Shift+H'),
       moveOverlay: z.string().default('CommandOrControl+Alt')
     })

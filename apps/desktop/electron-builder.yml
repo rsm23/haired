@@ -2,6 +2,9 @@ appId: com.seifelmoulouk.hiarded
 productName: Haired
 artifactName: Haired-${version}-${os}-${arch}.${ext}
 asar: true
+extraResources:
+  - from: browser-extension
+    to: browser-extension
 asarUnpack:
   - "**/node_modules/better-sqlite3/**/*"
 directories:

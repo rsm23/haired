@@ -198,6 +198,11 @@ const bridgeError =
 
 const unavailableApi: HairedApi = {
   getBootstrap: async () => ({ ok: false, error: bridgeError }),
+  getBrowserTabStatus: async () => ({ ok: false, error: bridgeError }),
+  copyBrowserTabPairingCode: async () => ({ ok: false, error: bridgeError }),
+  openBrowserExtension: async () => ({ ok: false, error: bridgeError }),
+  selectBrowserTab: async () => ({ ok: false, error: bridgeError }),
+  cancelBrowserTabSelection: async () => ({ ok: false, error: bridgeError }),
   quit: async () => ({ ok: false, error: bridgeError }),
   updateSettings: async () => ({ ok: false, error: bridgeError }),
   startCapture: async () => ({ ok: false, error: bridgeError }),
@@ -316,6 +321,8 @@ export default function App() {
     surface = <BridgeUnavailable />
   } else if (kind === 'selector') {
     surface = <Selector mode={params.get('mode') === 'ask' ? 'ask' : 'instant'} />
+  } else if (kind === 'tab-selector') {
+    surface = <TabSelector />
   } else if (kind === 'overlay') {
     surface = <AnswerOverlay id={params.get('id') ?? ''} />
   } else {
@@ -676,7 +683,7 @@ function ProvidersPage({
                     <span className={cn('provider-state', provider.ready && 'provider-state-ready')}>
                       <i />
                       {providerStateLabel(provider)}
-                      {provider.selected && <b>· In use</b>}
+                      {provider.selected && <b>· {provider.ready ? 'In use' : 'Selected'}</b>}
                     </span>
                   </div>
                   <Switch
@@ -786,7 +793,7 @@ function ProvidersPage({
                     disabled={!provider.ready || provider.selected || busy === provider.id}
                     onClick={() => void selectProvider(provider.id)}
                   >
-                    {provider.selected ? 'In use' : 'Use provider'}
+                    {provider.selected ? (provider.ready ? 'In use' : 'Selected') : 'Use provider'}
                   </Button>
                 </footer>
               </article>
@@ -834,7 +841,7 @@ function ProvidersPage({
                       <span className={cn('provider-state', provider.ready && 'provider-state-ready')}>
                         <i />
                         {providerStateLabel(provider)}
-                        {provider.selected && <b>· In use</b>}
+                        {provider.selected && <b>· {provider.ready ? 'In use' : 'Selected'}</b>}
                       </span>
                     </span>
                   </button>
@@ -933,7 +940,7 @@ function ProvidersPage({
                         disabled={!provider.ready || provider.selected || busy === provider.id}
                         onClick={() => void selectProvider(provider.id)}
                       >
-                        {provider.selected ? 'In use' : 'Use provider'}
+                        {provider.selected ? (provider.ready ? 'In use' : 'Selected') : 'Use provider'}
                       </Button>
                     </footer>
                   </div>
@@ -980,7 +987,7 @@ function ProvidersPage({
                       <span className={cn('provider-state', provider.ready && 'provider-state-ready')}>
                         <i />
                         {provider.hasKey ? 'Key saved' : providerStateLabel(provider)}
-                        {provider.selected && <b>· In use</b>}
+                        {provider.selected && <b>· {provider.ready ? 'In use' : 'Selected'}</b>}
                       </span>
                     </span>
                   </button>
@@ -1116,7 +1123,7 @@ function ProvidersPage({
                         disabled={!provider.ready || provider.selected || busy === provider.id}
                         onClick={() => void selectProvider(provider.id)}
                       >
-                        {provider.selected ? 'In use' : 'Use provider'}
+                        {provider.selected ? (provider.ready ? 'In use' : 'Selected') : 'Use provider'}
                       </Button>
                     </footer>
                   </div>
@@ -1158,6 +1165,12 @@ function ShortcutsPage({
       title: 'Select & ask',
       detail: 'Capture a region, then type a question beside it.',
       icon: CircleHelp
+    },
+    {
+      id: 'browserTab',
+      title: 'Select tab & answer',
+      detail: 'Press this shortcut, then click a browser tab. Requires the Haired extension.',
+      icon: Zap
     },
     {
       id: 'settings',
@@ -1347,8 +1360,52 @@ function ShortcutsPage({
           </AlertDescription>
         </Alert>
       )}
+      <BrowserTabSetup />
     </div>
   )
+}
+
+function BrowserTabSetup() {
+  const [status, setStatus] = useState<{ connected: boolean; error: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    const refresh = () => { void api.getBrowserTabStatus().then(unwrap).then(setStatus).catch(() => undefined) }
+    refresh()
+    const timer = window.setInterval(refresh, 3000)
+    return () => window.clearInterval(timer)
+  }, [])
+  async function action(run: () => Promise<unknown>) {
+    setBusy(true)
+    try { await run() } catch (error) { toast.error(messageOf(error)) } finally { setBusy(false) }
+  }
+  return <Card>
+    <CardHeader><CardTitle>Browser tab capture</CardTitle><CardDescription>Capture only the visible page in a Chrome or Edge tab, using your existing answer settings.</CardDescription></CardHeader>
+    <CardContent>
+      <p>Load the companion folder as an unpacked extension from your browser’s Extensions page, then open its options and paste your pairing code.</p>
+      <p>Press Select tab &amp; answer, then click the browser tab you want within 30 seconds. Your current tab works too.</p>
+      <p>The extension needs permission to capture web tabs. Haired’s selection and answer windows keep their existing protection; macOS remains best effort.</p>
+      <Badge variant={status?.error ? 'destructive' : 'outline'}>{status?.error || (status?.connected ? 'Extension connected' : 'Extension not connected')}</Badge>
+    </CardContent>
+    <CardFooter className="privacy-actions">
+      <Button variant="outline" disabled={busy} onClick={() => void action(async () => {
+        const error = await unwrap(await api.openBrowserExtension())
+        if (error) throw new Error(error)
+      })}>Open extension folder</Button>
+      <Button variant="outline" disabled={busy} onClick={() => void action(async () => {
+        await unwrap(await api.copyBrowserTabPairingCode()); toast.success('Pairing code copied. Paste it into the extension options.')
+      })}>Copy pairing code</Button>
+      <Button disabled={busy || !status?.connected} onClick={() => void action(async () => { await unwrap(await api.selectBrowserTab()) })}>Select tab</Button>
+    </CardFooter>
+  </Card>
+}
+
+function TabSelector() {
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => { if (event.key === 'Escape') void api.cancelBrowserTabSelection() }
+    window.addEventListener('keydown', cancel)
+    return () => window.removeEventListener('keydown', cancel)
+  }, [])
+  return null
 }
 
 function ShortcutKeys({ value }: { value: string }) {

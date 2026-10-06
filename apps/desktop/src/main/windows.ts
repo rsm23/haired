@@ -6,7 +6,7 @@ import {
   type Rectangle
 } from 'electron'
 
-export type HairedWindowKind = 'settings' | 'selector' | 'overlay'
+export type HairedWindowKind = 'settings' | 'selector' | 'overlay' | 'tab-selector'
 
 function safeExternalUrl(value: string): boolean {
   try {
@@ -48,7 +48,7 @@ export function createProtectedWindow(input: {
     minimizable: false,
     maximizable: input.kind === 'settings',
     fullscreenable: false,
-    hasShadow: input.kind !== 'selector',
+    hasShadow: input.kind !== 'selector' && input.kind !== 'tab-selector',
     ...(input.bounds ?? {}),
     webPreferences: {
       preload: input.preload,
