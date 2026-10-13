@@ -2,10 +2,15 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const desktopRequire = createRequire(join(root, 'apps/desktop/package.json'))
+const builderRequire = createRequire(desktopRequire.resolve('electron-builder/package.json'))
+const packagerRequire = createRequire(builderRequire.resolve('app-builder-lib/package.json'))
+const { listPackage } = packagerRequire('@electron/asar')
 const version = JSON.parse(readFileSync(join(root, 'apps/desktop/package.json'))).version
 const output = join(root, 'artifacts', `release-${version}`)
 const profile = process.env.APPLE_KEYCHAIN_PROFILE
@@ -46,7 +51,7 @@ function verifyApp(path) {
   run('spctl', ['--assess', '--type', 'execute', '--verbose=4', path])
   const resources = join(path, 'Contents/Resources')
   const archive = join(resources, 'app.asar')
-  if (/\.map$/m.test(run('pnpm', ['--filter', '@haired/desktop', 'exec', 'asar', 'list', archive], true))) throw new Error('Production source map found in application archive.')
+  if (listPackage(archive).some(file => file.endsWith('.map'))) throw new Error('Production source map found in application archive.')
   if (/sk-proj-|sk-ant-|AIzaSy|whsec_/.test(readFileSync(archive).toString('utf8'))) throw new Error('Secret-like material found in application archive.')
   if (!readFileSync(join(root, 'apps/desktop/assets/icon.icns')).equals(readFileSync(join(resources, 'icon.icns')))) throw new Error('Packaged icon differs from source.')
   for (const file of readdirSync(join(root, 'apps/desktop/browser-extension'))) {
