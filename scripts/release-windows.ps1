@@ -19,8 +19,15 @@ $env:VITE_PUBLIC_APP_URL = 'https://haired.seifelmoulouk.com/'
 $env:VITE_SUPPORT_EMAIL = 'rahmani@seifelmoulouk.com'
 
 function Invoke-Checked([string]$Command, [string[]]$Arguments) {
-    & $Command @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "$Command failed with exit code $LASTEXITCODE" }
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Command @Arguments
+        $nativeExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($nativeExitCode -ne 0) { throw "$Command failed with exit code $nativeExitCode" }
 }
 
 if ($UnsignedPreview) {
