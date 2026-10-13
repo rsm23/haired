@@ -1,7 +1,7 @@
 # Unreleased changes
 
-These changes are in the source tree and packages built from it. This document
-does not announce a new installer release or a Chrome Web Store listing.
+The changes below are included in [v0.1.4](v0.1.4.md). There is no separate
+Chrome Web Store listing.
 
 ## Browser tab capture
 

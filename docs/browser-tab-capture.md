@@ -5,7 +5,7 @@ Haired captures the visible viewport of a selected Chrome or Edge web tab. It do
 ## One-time setup
 
 Use a desktop build containing browser tab capture. These changes are documented
-in [unreleased changes](releases/unreleased.md); the previously published
+in [v0.1.4](releases/v0.1.4.md); the previously published
 v0.1.3 packages do not establish availability of this feature.
 
 1. Install the updated Haired app and open **Settings → Shortcuts**.

@@ -48,9 +48,8 @@ See the [browser tab capture guide](docs/browser-tab-capture.md) for setup,
 permissions, cancellation, and troubleshooting, or the
 [extension source](apps/desktop/browser-extension/).
 
-Tab capture is included in the current source and packages built from it. The
-existing v0.1.3 release notes describe the previously published macOS packages;
-see [unreleased changes](docs/releases/unreleased.md) for these additions.
+Tab capture is included in the signed macOS v0.1.4 installers. See the
+[v0.1.4 release notes](docs/releases/v0.1.4.md) for these additions.
 
 ### Connect your own providers
 
@@ -103,7 +102,7 @@ precedence. If a selected provider is unavailable, Settings labels it
 ## Quick start
 
 1. **Install Haired** from the [download page](https://haired.seifelmoulouk.com/#downloads):
-   macOS v0.1.3 for Apple silicon or Intel, or Windows 10/11 x64 v0.1.2.
+   macOS v0.1.4 for Apple silicon or Intel, or Windows 10/11 x64 v0.1.2.
 2. **Pick a provider** in Settings → AI providers:
    - Run `codex login` or `claude auth login` for CLI providers.
    - Start LM Studio's local server or `ollama serve` for local models.
@@ -123,7 +122,7 @@ For tab capture with a build containing the new feature, follow the
 | Move answer window | Hold `Cmd/Ctrl+Alt` + arrow keys |
 
 > [!NOTE]
-> The macOS v0.1.3 packages are signed with an Apple Developer ID certificate,
+> The macOS v0.1.4 packages are signed with an Apple Developer ID certificate,
 > notarized by Apple, and distributed with stapled notarization tickets. Choose
 > the Apple silicon or Intel DMG on the release page and optionally verify its
 > published SHA-256 checksum before installing.
@@ -142,6 +141,13 @@ Run `pnpm check` for lint, TypeScript checks, tests, and builds. Use
 build desktop installers with the production configuration. Desktop packages
 bundle the companion extension as an unpacked folder; it has no separate build
 step. Production publication follows the [release gates](docs/release-gates.md).
+
+Signed macOS packages can also be built, notarized, and verified locally with
+`APPLE_KEYCHAIN_PROFILE=your-profile pnpm release:mac`. Publish the verified
+artifacts through `gh release`, then run `pnpm publish:pages` to build the
+website locally and push its static files to the Pages branch. See
+[local publication](docs/local-publication.md) for the complete commands and
+the remaining GitHub Pages billing dependency.
 
 ## License
 
