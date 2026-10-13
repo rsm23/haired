@@ -115,3 +115,33 @@ before reporting success.
 - [Live version marker](https://haired.seifelmoulouk.com/release.json): v0.1.4 and
   the release source commit. The rendered download links and both public Mac
   installer URLs were checked after deployment.
+
+## Windows v0.1.4 backfill evidence
+
+The Windows installer was added on 2026-10-13 from source commit
+`3e34b5ea3202af797e92d2250c8c5fee705d7fef`. The original Mac release tag and
+Mac binaries were preserved. Windows is explicitly an unsigned preview because
+no Windows signing secrets, configured Azure identity, or usable code-signing
+certificate were available in the audited build environments.
+
+- Lint, TypeScript, production builds, and 108 tests passed on Windows; six
+  optional integration tests were skipped.
+- Authenticode reports `NotSigned` for the NSIS installer and packaged app.
+- The installed payload matched the packaged app, SQLite addon, and extension.
+- An isolated-profile launch verified SQLite initialization, a 403 response to
+  an unauthenticated browser-bridge request, and the visible version 0.1.4 UI.
+  The test environment was Windows 11 ARM64 with x64 emulation.
+- [Windows verification report](https://github.com/rsm23/haired/releases/download/v0.1.4/windows-verification.json)
+  and [Windows checksums](https://github.com/rsm23/haired/releases/download/v0.1.4/SHA256SUMS-windows-x64.txt)
+  are public. The aggregate manifest covers all Mac and Windows release assets.
+- The [Pages deployment](https://github.com/rsm23/haired/actions/runs/38359605867)
+  succeeded from `gh-pages` commit `2346a10`; the rendered Windows card and its
+  public installer URL were verified afterward.
+
+This native build compiled SQLite for Electron 43 using Python, MSVC, and the
+Windows SDK. The VM's system-account build used task-local Electron headers
+and the matching x64 import library to avoid system-directory redirection.
+Normal developer-account builds keep their build caches under the user profile.
+The full Windows 10 hardware, meeting, upgrade, and browser-capture matrices
+were not repeated. GitHub billing still blocked regular CI and CodeQL runs,
+but direct asset uploads and managed Pages branch deployment both succeeded.
