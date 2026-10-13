@@ -1105,7 +1105,7 @@ function Home() {
                 className="download-card"
                 href={downloadPackage.url}
                 key={downloadPackage.fileName}
-                aria-label={`Download ${downloadPackage.platform} for ${downloadPackage.architecture}`}
+                aria-label={`Download ${downloadPackage.platform} for ${downloadPackage.architecture}${downloadPackage.icon === MonitorDown ? ' (unsigned preview)' : ''}`}
               >
                 <span className="download-card-icon" aria-hidden="true">
                   <Icon />

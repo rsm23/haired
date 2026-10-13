@@ -54,7 +54,11 @@ aggregate checksum manifest also includes the Windows assets.
 
 ## Windows preview or signed build
 
-Use Windows with Node.js 22.12 or newer and pnpm 11.10.0. Install the frozen
+Use Windows with Node.js 22.12 or newer and pnpm 11.10.0. Electron 43's SQLite
+addon also needs Python, MSVC x64 C++ tools, and a Windows SDK for compilation
+when no matching prebuilt binary is available. See
+[node-gyp's Windows prerequisites](https://github.com/nodejs/node-gyp#on-windows).
+Install the frozen
 dependencies, then build an explicitly authorized unsigned preview with:
 
 ```powershell
