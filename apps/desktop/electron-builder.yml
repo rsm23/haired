@@ -12,6 +12,7 @@ directories:
 files:
   - out/**/*
   - package.json
+  - "!**/*.map"
 forceCodeSigning: true
 electronFuses:
   runAsNode: false

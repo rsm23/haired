@@ -22,6 +22,13 @@ for (const name of [`Haired-${version.slice(1)}-mac-arm64.dmg`, `Haired-${versio
   if (!release.assets.some(asset => asset.name === name)) throw new Error(`Release asset missing: ${name}`)
 }
 const settings = JSON.parse(run('gh', ['api', `repos/${repo}/pages`], root, true))
+const environment = JSON.parse(run('gh', ['api', `repos/${repo}/environments/github-pages`], root, true))
+if (environment.deployment_branch_policy?.custom_branch_policies) {
+  const policies = JSON.parse(run('gh', ['api', `repos/${repo}/environments/github-pages/deployment-branch-policies`], root, true))
+  if (!policies.branch_policies.some(policy => policy.type === 'branch' && [branch, '*'].includes(policy.name))) {
+    run('gh', ['api', '--method', 'POST', `repos/${repo}/environments/github-pages/deployment-branch-policies`, '-f', `name=${branch}`, '-f', 'type=branch'], root, true)
+  }
+}
 run('pnpm', ['--filter', '@haired/contracts', 'build'])
 run('pnpm', ['--filter', '@haired/web', 'build'])
 const staging = mkdtempSync(join(tmpdir(), 'haired-pages-'))
