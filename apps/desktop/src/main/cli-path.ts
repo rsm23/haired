@@ -9,13 +9,13 @@ export function cliEnvironment(
 ): NodeJS.ProcessEnv {
   if (platform !== 'darwin') return environment
   const directories = [
-    ...(environment.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin').split(path.delimiter),
-    path.join(home, '.vite-plus', 'bin'),
-    path.join(home, '.local', 'bin'),
-    path.join(home, '.npm-global', 'bin'),
+    ...(environment.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin').split(':'),
+    path.posix.join(home, '.vite-plus', 'bin'),
+    path.posix.join(home, '.local', 'bin'),
+    path.posix.join(home, '.npm-global', 'bin'),
     '/opt/homebrew/bin', '/usr/local/bin'
   ].filter(Boolean)
-  return { ...environment, PATH: [...new Set(directories)].join(path.delimiter) }
+  return { ...environment, PATH: [...new Set(directories)].join(':') }
 }
 
 export function resolveCliExecutable(binary: string, environment = cliEnvironment()): string {
