@@ -6,6 +6,11 @@ if (-not $IsWindows -and $env:OS -ne 'Windows_NT') { throw 'Run this script on W
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 $version = (Get-Content 'apps/desktop/package.json' -Raw | ConvertFrom-Json).version
+$sourceCommit = $env:HAIRED_SOURCE_COMMIT
+if (-not $sourceCommit) {
+    $sourceCommit = & git rev-parse HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the release source commit.' }
+}
 $output = Join-Path $root "artifacts/release-$version/windows"
 $env:NODE_ENV = 'production'
 $env:VITE_RELEASE_OWNER = 'rsm23'
@@ -52,7 +57,7 @@ $report = [ordered]@{
     version = $version
     platform = 'win32'
     architecture = 'x64'
-    sourceCommit = $env:HAIRED_SOURCE_COMMIT
+    sourceCommit = $sourceCommit
     signing = $signing
     installerSignature = [string]$installerSignature.Status
     appSignature = [string]$appSignature.Status
@@ -63,8 +68,9 @@ $report = [ordered]@{
     nativeMatrixRepeated = $false
     verifiedAt = [DateTime]::UtcNow.ToString('o')
 }
-$report | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $output 'windows-verification.json') -Encoding UTF8
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText((Join-Path $output 'windows-verification.json'), ($report | ConvertTo-Json -Depth 5) + "`n", $utf8)
 $assets = @(Get-ChildItem $output -File | Where-Object { $_.Name -match '\.(exe|exe\.blockmap)$' -or $_.Name -in @('latest.yml', 'windows-verification.json') } | Sort-Object Name)
 $checksums = $assets | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $_.Name }
-$checksums | Set-Content (Join-Path $output 'SHA256SUMS-windows-x64.txt') -Encoding UTF8
+[IO.File]::WriteAllText((Join-Path $output 'SHA256SUMS-windows-x64.txt'), ($checksums -join "`n") + "`n", $utf8)
 Write-Output "Verified Windows $signing assets: $output"

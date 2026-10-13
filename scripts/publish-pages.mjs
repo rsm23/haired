@@ -18,7 +18,7 @@ function run(command, args, cwd = root, capture = false, input) {
 }
 const release = JSON.parse(run('gh', ['release', 'view', version, '--repo', repo, '--json', 'isDraft,assets'], root, true))
 if (release.isDraft) throw new Error('Publish the signed release before updating its download links.')
-for (const name of [`Haired-${version.slice(1)}-mac-arm64.dmg`, `Haired-${version.slice(1)}-mac-x64.dmg`, 'SHA256SUMS.txt']) {
+for (const name of [`Haired-${version.slice(1)}-mac-arm64.dmg`, `Haired-${version.slice(1)}-mac-x64.dmg`, `Haired-${version.slice(1)}-win-x64.exe`, 'SHA256SUMS.txt']) {
   if (!release.assets.some(asset => asset.name === name)) throw new Error(`Release asset missing: ${name}`)
 }
 const settings = JSON.parse(run('gh', ['api', `repos/${repo}/pages`], root, true))

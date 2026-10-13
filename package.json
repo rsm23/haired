@@ -17,6 +17,7 @@
     "typecheck": "pnpm --filter @haired/contracts build && pnpm -r --if-present typecheck",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "release:mac": "node scripts/release-mac.mjs",
+    "release:windows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/release-windows.ps1",
     "publish:pages": "node scripts/publish-pages.mjs"
   },
   "devDependencies": {

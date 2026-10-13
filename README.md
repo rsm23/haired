@@ -102,7 +102,7 @@ precedence. If a selected provider is unavailable, Settings labels it
 ## Quick start
 
 1. **Install Haired** from the [download page](https://haired.seifelmoulouk.com/#downloads):
-   macOS v0.1.4 for Apple silicon or Intel, or Windows 10/11 x64 v0.1.2.
+   macOS v0.1.4 for Apple silicon or Intel, or the unsigned Windows 10/11 x64 v0.1.4 preview.
 2. **Pick a provider** in Settings → AI providers:
    - Run `codex login` or `claude auth login` for CLI providers.
    - Start LM Studio's local server or `ollama serve` for local models.
@@ -126,6 +126,10 @@ For tab capture with a build containing the new feature, follow the
 > notarized by Apple, and distributed with stapled notarization tickets. Choose
 > the Apple silicon or Intel DMG on the release page and optionally verify its
 > published SHA-256 checksum before installing.
+
+> The Windows v0.1.4 installer is an **unsigned preview**. A Windows signing
+> certificate or configured Azure Trusted Signing identity is not available for
+> this publication. Its published SHA-256 checksum verifies the downloaded file.
 
 ## Development
 

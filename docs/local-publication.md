@@ -48,7 +48,37 @@ gh release edit v0.1.4 --repo rsm23/haired --draft=false --latest
 ```
 
 The pre-stapling DMG blockmaps and builder debug files are deliberately excluded.
-The Windows v0.1.2 preview remains linked separately.
+Windows v0.1.4 is published as a separately labelled unsigned preview in the
+same release. Its Windows checksum manifest is separate, and the public
+aggregate checksum manifest also includes the Windows assets.
+
+## Windows preview or signed build
+
+Use Windows with Node.js 22.12 or newer and pnpm 11.10.0. Install the frozen
+dependencies, then build an explicitly authorized unsigned preview with:
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm release:windows -UnsignedPreview
+```
+
+Without `-UnsignedPreview`, the script requires the configured Azure signing
+endpoint, account, certificate profile, and publisher name, and validates
+Authenticode signatures before succeeding. Azure authentication must also be
+available to the signing provider. No signing failure silently falls back to
+an unsigned build.
+
+The Windows script runs `pnpm check`, builds NSIS locally, verifies the packaged
+version and x64 application/SQLite binaries, checks signature status and bundled
+extension files, and rejects source maps and secret-like material. Outputs are
+under `artifacts/release-VERSION/windows/`: the installer, blockmap, updater
+metadata, verification report, and Windows SHA-256 manifest.
+
+Upload those files directly with `gh release upload`; review the installer and
+update the release notes to state its actual signing status. Add the new asset
+digests to the aggregate `SHA256SUMS.txt` without changing existing Mac binaries.
+This path does not use a GitHub Actions runner. Use `pnpm publish:pages` only
+after the public Mac and Windows assets exist.
 
 ## GitHub Pages
 

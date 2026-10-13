@@ -45,7 +45,7 @@ const RELEASE_REPOSITORY_URL =
 const RELEASE_DOWNLOAD_BASE_URL = `${RELEASE_REPOSITORY_URL}/releases/download/${RELEASE_VERSION}`
 const RELEASE_PAGE_URL = `${RELEASE_REPOSITORY_URL}/releases/tag/${RELEASE_VERSION}`
 const CHECKSUM_URL = `${RELEASE_DOWNLOAD_BASE_URL}/SHA256SUMS.txt`
-const WINDOWS_RELEASE_VERSION = 'v0.1.2'
+const WINDOWS_RELEASE_VERSION = 'v0.1.4'
 const WINDOWS_RELEASE_NUMBER = WINDOWS_RELEASE_VERSION.replace(/^v/, '')
 const WINDOWS_RELEASE_DOWNLOAD_BASE_URL = `${RELEASE_REPOSITORY_URL}/releases/download/${WINDOWS_RELEASE_VERSION}`
 const WINDOWS_RELEASE_PAGE_URL = `${RELEASE_REPOSITORY_URL}/releases/tag/${WINDOWS_RELEASE_VERSION}`
@@ -84,7 +84,7 @@ const downloadPackages = [
   {
     platform: 'Windows 10 / 11',
     architecture: '64-bit Intel or AMD',
-    format: `NSIS installer · ${WINDOWS_RELEASE_VERSION} · .exe`,
+    format: `Unsigned preview · ${WINDOWS_RELEASE_VERSION} · .exe`,
     fileName: `Haired-${WINDOWS_RELEASE_NUMBER}-win-x64.exe`,
     url: `${WINDOWS_RELEASE_DOWNLOAD_BASE_URL}/Haired-${WINDOWS_RELEASE_NUMBER}-win-x64.exe`,
     icon: MonitorDown
@@ -1092,7 +1092,7 @@ function Home() {
             </h2>
           </div>
           <p>
-            Windows 10/11 x64 plus Apple Developer signed and notarized packages for Apple silicon
+            An unsigned Windows 10/11 x64 preview plus Apple Developer signed and notarized packages for Apple silicon
             and Intel Macs. Every button points directly to its GitHub-hosted release asset.
           </p>
         </div>
@@ -1129,6 +1129,7 @@ function Home() {
               <strong>macOS {RELEASE_VERSION} is signed and notarized by Apple.</strong> Both Mac
               apps and disk images carry a Developer ID signature and a stapled notarization
               ticket. You can also verify the published SHA-256 checksum before opening one.
+              {' '}Windows {WINDOWS_RELEASE_VERSION} is an unsigned preview.
             </p>
           </div>
           <div className="release-links">
@@ -1136,7 +1137,7 @@ function Home() {
               Release notes <ExternalLink />
             </a>
             <a href={CHECKSUM_URL} target="_blank" rel="noreferrer">
-              macOS checksums <ExternalLink />
+              Checksums <ExternalLink />
             </a>
             <a href={WINDOWS_RELEASE_PAGE_URL} target="_blank" rel="noreferrer">
               Windows release <ExternalLink />
