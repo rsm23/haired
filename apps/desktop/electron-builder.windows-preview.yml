@@ -1,0 +1,7 @@
+extends: electron-builder.preview.yml
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.map"
+win:
+  signExecutable: false
