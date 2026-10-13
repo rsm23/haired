@@ -14,14 +14,15 @@ const { listPackage } = packagerRequire('@electron/asar')
 const version = JSON.parse(readFileSync(join(root, 'apps/desktop/package.json'))).version
 const output = join(root, 'artifacts', `release-${version}`)
 const profile = process.env.APPLE_KEYCHAIN_PROFILE
-const identity = process.env.CSC_NAME || 'Developer ID Application: Rahmani Seif El Moulouk (WQ983X3Y8P)'
+const signingName = (process.env.CSC_NAME || 'Rahmani Seif El Moulouk (WQ983X3Y8P)').replace(/^Developer ID Application:\s*/, '')
+const identity = `Developer ID Application: ${signingName}`
 if (process.platform !== 'darwin' || !profile) {
   throw new Error('Run on macOS with APPLE_KEYCHAIN_PROFILE set to a notarytool credential profile.')
 }
 const env = {
   ...process.env,
   NODE_ENV: 'production',
-  CSC_NAME: identity,
+  CSC_NAME: signingName,
   VITE_RELEASE_OWNER: 'rsm23',
   VITE_RELEASE_REPO: 'haired',
   VITE_PUBLIC_APP_URL: 'https://haired.seifelmoulouk.com/',
