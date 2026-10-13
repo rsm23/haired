@@ -62,8 +62,22 @@ domain and sets Pages to publish from that branch. `.nojekyll` skips Jekyll.
 The obsolete custom Pages build workflow has been removed.
 
 GitHub still performs the final Pages deployment even for a prebuilt branch.
-An account-wide billing lock can block that managed deployment as well; branch
-publishing cannot guarantee a bypass. Verify the deployment run and the live
-`release.json` version before reporting success. If GitHub rejects it for
-billing, the signed GitHub Release can still be published, but the Pages site
-requires the account lock to be resolved by its owner.
+On 2026-10-13, the managed branch deployment succeeded for v0.1.4 while the
+account billing lock continued to block regular CI and CodeQL workflows.
+Verify the deployment run and the live `release.json` version on every update
+before reporting success.
+
+## v0.1.4 publication evidence
+
+- Release source and annotated tag: `7bb55042ceb72c2c05736973207390582cb8144c`.
+- Public [signed release](https://github.com/rsm23/haired/releases/tag/v0.1.4):
+  both DMGs, both ZIPs, ZIP blockmaps, updater metadata, verification report,
+  and checksums. All nine uploaded assets matched local SHA-256 digests.
+- [Verification report](https://github.com/rsm23/haired/releases/download/v0.1.4/release-verification.json):
+  signatures, notarization tickets, Gatekeeper, mounted apps, bundled extension,
+  ZIP verification, and automated checks. The full native matrix was not repeated.
+- [Successful Pages deployment](https://github.com/rsm23/haired/actions/runs/38329143794)
+  from `gh-pages` commit `a9b186ead0ff67c5ae845d239a482c981968fe6e`.
+- [Live version marker](https://haired.seifelmoulouk.com/release.json): v0.1.4 and
+  the release source commit. The rendered download links and both public Mac
+  installer URLs were checked after deployment.

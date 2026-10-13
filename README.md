@@ -147,7 +147,7 @@ Signed macOS packages can also be built, notarized, and verified locally with
 artifacts through `gh release`, then run `pnpm publish:pages` to build the
 website locally and push its static files to the Pages branch. See
 [local publication](docs/local-publication.md) for the complete commands and
-the remaining GitHub Pages billing dependency.
+deployment verification.
 
 ## License
 
